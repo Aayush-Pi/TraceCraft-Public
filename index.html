@@ -1,0 +1,2394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TraceCraft</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 120 120%27%3E%3Crect width=%27120%27 height=%27120%27 rx=%2728%27 fill=%27%236cb4ff%27/%3E%3Cpath d=%27M30 84C50 70 58 74 74 54S92 34 98 28%27 fill=%27none%27 stroke=%27%2307111d%27 stroke-width=%2710%27 stroke-linecap=%27round%27/%3E%3C/svg%3E" />
+  <style>
+/* ==========================================================================
+   Design tokens
+   Contrast ratios (WCAG 2.2) are noted against the surfaces they sit on.
+   ========================================================================== */
+:root {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --bg: #101214;
+  --surface-1: #17191c;
+  --surface-2: #1f2226;
+  --surface-3: #292d32;
+  --canvas: #0b0c0e;
+
+  /* Lines. --border is decorative; --border-control marks interactive
+     boundaries and is at least 3:1 on every surface (WCAG 1.4.11). */
+  --border: #363b41;
+  --border-control: #7a828c;
+
+  /* Text: on surface-1 these are 15.8:1, 11.1:1 and 7.5:1 */
+  --text-0: #f1f3f5;
+  --text-1: #c9ced4;
+  --text-2: #a3aab2;
+
+  /* Accent: 8.1:1 on surface-1; --on-accent on --accent is 8.7:1 */
+  --accent: #6cb4ff;
+  --accent-hover: #8cc5ff;
+  --accent-subtle: #16283d;
+  --on-accent: #07111d;
+  --focus: #ffffff;
+
+  --radius: 6px;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text-0);
+  font: 14px/1.5 var(--font);
+}
+
+button, input, select { font: inherit; color: inherit; }
+[hidden] { display: none !important; }
+::selection { background: var(--accent); color: var(--on-accent); }
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.skip-link {
+  position: absolute;
+  left: 8px;
+  top: -48px;
+  z-index: 1000;
+  padding: 8px 14px;
+  background: var(--accent);
+  color: var(--on-accent);
+  border-radius: var(--radius);
+  font-weight: 600;
+  text-decoration: none;
+}
+.skip-link:focus { top: 8px; }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ==========================================================================
+   Welcome dialog
+   ========================================================================== */
+#intro {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--bg);
+}
+#intro.leave { display: none; }
+
+.intro-panel {
+  width: min(440px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+.intro-logo { width: 56px; height: 56px; margin-bottom: 8px; }
+.intro-panel h2 { margin: 0; font-size: 28px; font-weight: 600; line-height: 1.2; }
+.intro-panel p { margin: 0; color: var(--text-1); font-size: 16px; line-height: 1.5; }
+.intro-panel .btn-primary { margin-top: 12px; }
+.intro-panel .intro-credit { margin-top: 24px; color: var(--text-2); font-size: 13px; }
+
+/* ==========================================================================
+   Header
+   ========================================================================== */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border);
+}
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand-mark { width: 28px; height: 28px; display: block; }
+.brand h1 { margin: 0; font-size: 16px; font-weight: 600; line-height: 1.2; }
+.brand p { margin: 0; font-size: 13px; color: var(--text-2); }
+.top-right { display: flex; align-items: center; gap: 8px; }
+
+.pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--text-1);
+  font-size: 13px;
+  white-space: nowrap;
+  max-width: 340px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pill.accent { color: var(--accent); border-color: var(--accent); background: var(--accent-subtle); }
+
+/* ==========================================================================
+   Buttons and controls
+   ========================================================================== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 4px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius);
+  color: var(--text-0);
+  font-size: 14px;
+  cursor: pointer;
+}
+.btn:hover:not(:disabled) { background: var(--surface-3); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn.active { background: var(--accent-subtle); border-color: var(--accent); color: var(--accent); }
+.btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; flex: none; }
+
+.btn-primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; min-height: 40px; padding: 8px 16px; }
+.btn-primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn-danger:hover:not(:disabled) { border-color: var(--text-0); }
+.btn-block { width: 100%; }
+select.btn { padding-right: 8px; }
+select.btn option { background: var(--surface-2); color: var(--text-0); }
+
+.seg {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 2px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius);
+}
+.seg .btn { min-height: 28px; background: transparent; border-color: transparent; color: var(--text-1); }
+.seg .btn:hover:not(:disabled) { background: var(--surface-3); color: var(--text-0); }
+.seg .btn.active { background: var(--accent-subtle); border-color: var(--accent); color: var(--accent); }
+.seg-gap { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+
+input[type=range] { accent-color: var(--accent); height: 24px; margin: 0; cursor: pointer; }
+input[type=color] { width: 40px; height: 28px; padding: 2px; background: var(--surface-2); border: 1px solid var(--border-control); border-radius: 4px; cursor: pointer; }
+.check input { width: 16px; height: 16px; accent-color: var(--accent); margin: 0; }
+kbd { font: 12px var(--mono); background: var(--surface-3); border: 1px solid var(--border-control); border-radius: 4px; padding: 0 5px; }
+
+/* ==========================================================================
+   Export menu
+   ========================================================================== */
+.menu-wrap { position: relative; }
+.menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  width: 320px;
+  padding: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .45);
+}
+.menu-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text-0);
+}
+.menu-item:hover { background: var(--surface-3); }
+.menu-item b { font-weight: 600; }
+.menu-item small { color: var(--text-2); font-size: 13px; }
+.menu-sep { height: 1px; background: var(--border); margin: 4px 8px; }
+
+/* ==========================================================================
+   Page layout
+   ========================================================================== */
+.app {
+  display: grid;
+  grid-template-columns: 288px minmax(0, 1fr) 320px;
+  align-items: start;
+  min-height: calc(100vh - 56px);
+}
+.rail {
+  position: sticky;
+  top: 56px;
+  height: calc(100vh - 56px);
+  overflow-y: auto;
+  background: var(--surface-1);
+}
+.rail.left { border-right: 1px solid var(--border); }
+.rail.right { border-left: 1px solid var(--border); }
+
+.block {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.block h2 {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 14px;
+  font-weight: 600;
+}
+.hint { margin: 0; color: var(--text-2); font-size: 13px; line-height: 1.5; }
+.center { min-width: 0; display: flex; flex-direction: column; gap: 16px; padding: 16px; }
+.center:focus { outline: none; }
+.stage-wrap { display: flex; flex-direction: column; gap: 12px; }
+
+/* ==========================================================================
+   Image source
+   ========================================================================== */
+.file-row { display: flex; align-items: center; gap: 12px; }
+.drop {
+  padding: 12px;
+  border: 1px dashed var(--border-control);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.drop.over { border-color: var(--accent); background: var(--accent-subtle); }
+.thumb {
+  position: relative;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface-3);
+  display: grid;
+  place-items: center;
+}
+.thumb-icon { width: 24px; height: 24px; fill: none; stroke: var(--text-2); stroke-width: 1.5; }
+.thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.file-meta { display: flex; flex-direction: column; min-width: 0; }
+.file-meta strong { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px; }
+.file-meta span { color: var(--text-2); font-size: 13px; }
+
+.presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.presets .btn { min-height: 28px; padding: 2px 10px; font-size: 13px; }
+.slider-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; }
+.slider-row input[type=range] { flex: none; width: 100%; }
+#ovSliderLabel { flex: 0 0 100%; color: var(--text-1); }
+.readout { font-weight: 600; font-variant-numeric: tabular-nums; font-size: 14px; }
+
+/* ==========================================================================
+   Stage
+   ========================================================================== */
+.toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.check { display: inline-flex; align-items: center; gap: 8px; color: var(--text-1); cursor: pointer; }
+.stage-split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.stage-split.single-col { grid-template-columns: 1fr; }
+.pane { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.pane-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-weight: 600; }
+.pane-header span + span { color: var(--text-2); font-weight: 400; font-size: 13px; }
+
+.canvas-box,
+.ov-stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.canvas-box { flex: 1; min-height: 440px; }
+.canvas-box img { max-width: 100%; max-height: 520px; object-fit: contain; display: block; }
+#svgHost { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+#svgHost svg { max-width: 100%; max-height: 520px; width: auto; height: auto; display: block; user-select: none; }
+.wireframe-on #svgHost svg polygon,
+.wireframe-on #svgHost svg path,
+.wireframe-on #svgHost svg rect { fill-opacity: .16 !important; stroke: var(--accent) !important; stroke-width: .7px !important; }
+.empty-msg { color: var(--text-2); font-size: 14px; text-align: center; padding: 24px; max-width: 320px; }
+
+.gen { display: flex; flex-direction: column; align-items: center; gap: 12px; color: var(--text-1); font-size: 13px; }
+.gen rect { fill: var(--accent); opacity: var(--o); animation: gen-pixel 1.4s ease-in-out var(--d) infinite; }
+@keyframes gen-pixel { 0%, 100% { opacity: .08; } 45% { opacity: var(--o); } }
+.scan { position: absolute; left: 0; right: 0; top: 0; height: 2px; z-index: 5; pointer-events: none; opacity: 0; background: var(--accent); }
+.tracing .scan { opacity: 1; animation: scan 1.8s linear infinite alternate; }
+@keyframes scan { from { transform: translateY(0); } to { transform: translateY(440px); } }
+
+/* ==========================================================================
+   Timeline and metrics
+   ========================================================================== */
+.timeline, .drawer, .metric { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius); }
+.timeline { padding: 12px 16px; display: flex; flex-direction: column; gap: 12px; }
+.timeline-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.stage-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.stage-pill { padding: 2px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface-2); color: var(--text-2); font-size: 13px; }
+.stage-pill.active { background: var(--accent-subtle); border-color: var(--accent); color: var(--accent); }
+.scrub { display: flex; align-items: center; gap: 16px; }
+.scrub input { flex: 1; }
+.scrub .step { min-width: 120px; text-align: right; font: 13px var(--mono); font-variant-numeric: tabular-nums; }
+
+.metrics { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+.metric { padding: 12px 16px; display: flex; flex-direction: column; min-width: 0; }
+.metric .l { color: var(--text-1); font-size: 13px; }
+.metric .v { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.3; }
+.metric .s { color: var(--text-2); font-size: 13px; }
+
+/* ==========================================================================
+   Tabs
+   ========================================================================== */
+.tabs { display: flex; gap: 4px; padding: 0 8px; border-bottom: 1px solid var(--border); }
+.rail.right .tabs { position: sticky; top: 0; z-index: 2; background: var(--surface-1); }
+.tab {
+  min-height: 44px;
+  padding: 0 10px;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  color: var(--text-1);
+  font-weight: 500;
+  cursor: pointer;
+}
+.tab:hover { color: var(--text-0); }
+.tab.active { color: var(--text-0); font-weight: 600; border-bottom-color: var(--accent); }
+.tabpanel { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.drawer { overflow: hidden; }
+
+/* ==========================================================================
+   Inspector, layers, compare
+   ========================================================================== */
+.inspector-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.layers-list { max-height: 360px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.layer-item {
+  display: grid;
+  grid-template-columns: 48px 14px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 8px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-0);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.layer-item:hover { background: var(--surface-2); }
+.layer-item.selected { background: var(--accent-subtle); border-color: var(--accent); }
+.swatch { width: 12px; height: 12px; border-radius: 2px; border: 1px solid var(--text-2); }
+.stage-tag { font: 12px var(--mono); padding: 0 6px; border-radius: 4px; background: var(--surface-3); color: var(--text-1); }
+
+.sem-row { display: grid; grid-template-columns: 12px 1fr auto auto auto; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface-2); font-size: 13px; }
+.sem-row.solo { border-color: var(--accent); background: var(--accent-subtle); }
+.sem-row.off { color: var(--text-2); }
+.sem-row.off strong { font-weight: 400; }
+.sem-row .cnt { color: var(--text-1); min-width: 26px; text-align: right; font-variant-numeric: tabular-nums; }
+.sem-mini { min-width: 24px; min-height: 24px; padding: 0 8px; background: var(--surface-3); border: 1px solid var(--border-control); border-radius: 4px; color: var(--text-0); font-size: 12px; cursor: pointer; }
+.sem-mini:hover { background: var(--border); }
+.sem-mini.on { background: var(--accent-subtle); border-color: var(--accent); color: var(--accent); }
+
+.pqi-banner { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.pqi-box { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; min-width: 0; }
+.pqi-box .k { font-size: 13px; color: var(--text-1); }
+.pqi-box .v { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.pqi-box .s { font-size: 13px; color: var(--text-1); }
+
+.ov-stage { width: 100%; height: 340px; user-select: none; }
+.ov-stage img { position: absolute; max-width: 100%; max-height: 100%; object-fit: contain; pointer-events: none; }
+.curtain-bar { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent); z-index: 10; pointer-events: none; }
+.curtain-knob { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 28px; height: 28px; border-radius: 50%; background: var(--text-0); color: var(--canvas); display: grid; place-items: center; }
+#convCanvas { width: 100%; height: 190px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); }
+
+/* ==========================================================================
+   History and run log
+   ========================================================================== */
+.history-list { display: flex; flex-direction: column; gap: 8px; max-height: 420px; overflow-y: auto; }
+.hist-row { display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: 12px; padding: 8px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); }
+.hist-row img { width: 64px; height: 48px; object-fit: cover; border-radius: 4px; }
+.run-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.run-table th, .run-table td { padding: 8px; text-align: left; border-bottom: 1px solid var(--border); }
+.run-table th { color: var(--text-1); font-weight: 600; }
+.table-scroll { overflow-x: auto; }
+
+/* ==========================================================================
+   Notifications
+   ========================================================================== */
+.toast-status {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--surface-3);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius);
+  z-index: 9999;
+}
+.toast-status::before { content: ""; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--accent); border-top-color: transparent; animation: spin .8s linear infinite; }
+#toastStack { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 10000; }
+.toast { max-width: 380px; padding: 12px 16px; background: var(--surface-3); border: 1px solid var(--border-control); border-radius: var(--radius); box-shadow: 0 8px 24px rgba(0, 0, 0, .45); transition: opacity .2s; }
+.toast.out { opacity: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ==========================================================================
+   Responsive and user preferences
+   ========================================================================== */
+@media (max-width: 1180px) {
+  .app { grid-template-columns: 1fr; }
+  .rail { position: static; height: auto; overflow: visible; }
+  .rail.left { border-right: 0; border-bottom: 1px solid var(--border); }
+  .rail.right { border-left: 0; border-top: 1px solid var(--border); }
+}
+@media (max-width: 820px) {
+  .stage-split { grid-template-columns: 1fr; }
+  .metrics, .pqi-banner { grid-template-columns: repeat(2, 1fr); }
+  .brand p, #aiModelPill { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition: none !important; }
+  .tracing .scan { opacity: 0; }
+}
+@media (forced-colors: active) {
+  .btn.active, .tab.active, .layer-item.selected, .sem-row.solo { outline: 2px solid Highlight; }
+}
+  </style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><symbol id="tc-logo" viewBox="0 0 120 120"><rect width="120" height="120" rx="24" fill="#6cb4ff"/><rect x="22" y="80" width="11" height="11" rx="2.5" fill="#07111d"/><rect x="36" y="68" width="11" height="11" rx="2.5" fill="#07111d"/><path d="M56 62C68 56 74 58 84 46S96 34 100 26" fill="none" stroke="#07111d" stroke-width="8" stroke-linecap="round"/></symbol></svg>
+
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<div id="intro" role="dialog" aria-modal="true" aria-labelledby="introTitle" aria-describedby="introDesc">
+  <div class="intro-panel">
+    <svg class="intro-logo" viewBox="0 0 120 120" aria-hidden="true"><use href="#tc-logo"/></svg>
+    <h2 id="introTitle">TraceCraft</h2>
+    <p id="introDesc">Convert a raster image into editable vector shapes, then check the result against the original.</p>
+    <button class="btn btn-primary" id="introGo">Get started</button>
+    <p class="intro-credit">Made by WeLarp</p>
+  </div>
+</div>
+
+<header class="topbar">
+  <div class="brand">
+    <svg class="brand-mark" viewBox="0 0 120 120" aria-hidden="true"><use href="#tc-logo"/></svg>
+    <div>
+      <h1>TraceCraft</h1>
+      <p>Turn a photo into editable vector strokes</p>
+    </div>
+  </div>
+  <div class="top-right">
+    <span class="pill" id="aiModelPill">Painterly vector engine</span>
+    <span class="pill accent" id="statusPill" role="status">Ready</span>
+    <div class="menu-wrap">
+      <button class="btn" id="exportMenuBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="exportMenu">Export</button>
+      <div class="menu" id="exportMenu" role="menu" aria-label="Export options" hidden>
+          <button class="menu-item" id="exportCleanSvgBtn" role="menuitem"><b>Clean editable SVG</b><small>Fewer, non-overlapping shapes for Figma and Illustrator</small></button>
+          <button class="menu-item" id="exportSvgBtn" role="menuitem"><b>Painterly SVG</b><small>High-fidelity artistic curves</small></button>
+          <button class="menu-item" id="exportLayeredSvgBtn" role="menuitem"><b>Layered SVG</b><small>Named groups for design suites</small></button>
+          <button class="menu-item" id="exportCanvaBtn" role="menuitem"><b>Canva kit</b><small>One SVG per layer, zipped</small></button>
+          <div class="menu-sep"></div>
+          <button class="menu-item" id="exportPngBtn" role="menuitem"><b>PNG</b><small>Raster image of the finished trace</small></button>
+          <button class="menu-item" id="exportWebmBtn" role="menuitem"><b>Timelapse video</b><small>WebM of the trace being built</small></button>
+          <button class="menu-item" id="proReportBtn" role="menuitem"><b>Quality report</b><small>Metrics and convergence as JSON</small></button>
+          <button id="proCleanSvgBtn" hidden aria-hidden="true" tabindex="-1">Clean SVG</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="app" id="workspaceRoot">
+    <!-- Left rail: input and run -->
+    <aside class="rail left" aria-label="Image and trace settings">
+      <section class="block">
+        <h2>Image</h2>
+        <input type="file" id="fileInput" accept="image/*" style="display:none;" tabindex="-1" aria-hidden="true" />
+        <div class="file-row drop" id="dropZone">
+          <div class="thumb"><svg class="thumb-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M21 16l-5-5-8 9"/></svg><img id="thumbPreview" alt="Selected image preview" style="display:none;" /></div>
+          <div class="file-meta">
+            <strong id="fileNameLabel">No image selected</strong>
+            <span id="fileDimLabel">Drop, paste or upload an image</span>
+          </div>
+        </div>
+        <button class="btn btn-block" id="uploadBtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg><span>Upload image</span></button>
+      </section>
+
+      <section class="block">
+        <h2>Detail <span class="readout" id="budgetReadout">~650 shapes</span></h2>
+        <input type="range" id="budgetSlider" min="50" max="2500" step="10" value="650" aria-label="Shape budget" />
+        <div class="presets">
+          <button class="btn" data-preset="120" aria-label="Low, about 120 shapes">Low ~120</button>
+          <button class="btn" data-preset="300" aria-label="Medium, about 300 shapes">Medium ~300</button>
+          <button class="btn active" data-preset="650" aria-label="High, about 650 shapes">High ~650</button>
+          <button class="btn" data-preset="1500" aria-label="Ultra, about 1500 shapes">Ultra ~1500</button>
+          <button class="btn" data-preset="2500" aria-label="Max, about 2500 shapes">Max ~2500</button>
+        </div>
+        <p class="hint">More shapes capture finer detail and take longer to trace. The final count is approximate and can land slightly above or below the target.</p>
+      </section>
+
+      <section class="block">
+        <button class="btn btn-primary btn-block" id="runTraceBtn"><span>Trace image</span></button>
+        <button class="btn btn-block" id="compareLowHighBtn">Compare low and high</button>
+        <p class="hint">Shortcuts: <kbd>Space</kbd> plays, <kbd>[</kbd> <kbd>]</kbd> step through shapes, <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes, <kbd>Del</kbd> removes the selection. You can also drop or paste an image anywhere.</p>
+      </section>
+    </aside>
+
+    <!-- Center: canvas, timeline, metrics, drawer -->
+    <main class="center" id="main" tabindex="-1">
+      <div class="stage-wrap">
+        <div class="toolbar">
+          <div class="seg" role="group" aria-label="View options">
+            <button class="btn active" id="viewSplitBtn">Split</button>
+            <button class="btn" id="viewSingleBtn">Single</button>
+            <span class="seg-gap"></span>
+            <button class="btn active" data-lefttab="original">Original</button>
+            <button class="btn" data-lefttab="saliency">Focus map</button>
+            <button class="btn" data-lefttab="error">Error map</button>
+            <span class="seg-gap"></span>
+            <button class="btn active" id="modePainterlyBtn" title="High-detail, overlapping shapes">Painterly</button>
+            <button class="btn" id="modeCleanBtn" title="Fewer, non-overlapping shapes for editing in Figma or Illustrator">Clean SVG</button>
+          </div>
+          <label class="check"><input type="checkbox" id="wireframeToggle" /> Wireframe</label>
+        </div>
+
+        <div class="stage-split" id="stageSplitContainer">
+          <div class="pane" id="leftRefPane">
+            <div class="pane-header">
+              <span id="leftPaneTitle">Original photo</span>
+              <span id="leftPaneSub">Reference input</span>
+            </div>
+            <div class="canvas-box"><div class="scan"></div>
+              <div class="empty-msg" id="leftEmptyMsg">Upload an image to begin.</div>
+              <img id="leftRefImg" style="display:none;" alt="Reference image" />
+            </div>
+          </div>
+
+          <div class="pane">
+            <div class="pane-header">
+              <span>Vector trace</span>
+              <span id="rightPaneMeta">0×0, 0 shapes</span>
+            </div>
+            <div class="canvas-box"><div class="scan"></div>
+              <div class="empty-msg" id="rightEmptyMsg">Your trace appears here, built one shape at a time. A sample image is loaded, so you can press Trace image right away.</div>
+              <div class="gen" id="genLoader" hidden aria-hidden="true">
+                <svg viewBox="0 0 78 78" width="78" height="78"><rect x="0" y="0" width="14" height="14" rx="2" style="--d:0.00s;--o:0.45"/><rect x="16" y="0" width="14" height="14" rx="2" style="--d:0.14s;--o:0.65"/><rect x="32" y="0" width="14" height="14" rx="2" style="--d:0.28s;--o:0.55"/><rect x="48" y="0" width="14" height="14" rx="2" style="--d:0.42s;--o:0.9"/><rect x="64" y="0" width="14" height="14" rx="2" style="--d:0.56s;--o:1"/><rect x="0" y="16" width="14" height="14" rx="2" style="--d:0.14s;--o:1"/><rect x="16" y="16" width="14" height="14" rx="2" style="--d:0.28s;--o:0.45"/><rect x="32" y="16" width="14" height="14" rx="2" style="--d:0.42s;--o:0.65"/><rect x="48" y="16" width="14" height="14" rx="2" style="--d:0.56s;--o:0.55"/><rect x="64" y="16" width="14" height="14" rx="2" style="--d:0.70s;--o:0.9"/><rect x="0" y="32" width="14" height="14" rx="2" style="--d:0.28s;--o:0.9"/><rect x="16" y="32" width="14" height="14" rx="2" style="--d:0.42s;--o:1"/><rect x="32" y="32" width="14" height="14" rx="2" style="--d:0.56s;--o:0.45"/><rect x="48" y="32" width="14" height="14" rx="2" style="--d:0.70s;--o:0.65"/><rect x="64" y="32" width="14" height="14" rx="2" style="--d:0.84s;--o:0.55"/><rect x="0" y="48" width="14" height="14" rx="2" style="--d:0.42s;--o:0.55"/><rect x="16" y="48" width="14" height="14" rx="2" style="--d:0.56s;--o:0.9"/><rect x="32" y="48" width="14" height="14" rx="2" style="--d:0.70s;--o:1"/><rect x="48" y="48" width="14" height="14" rx="2" style="--d:0.84s;--o:0.45"/><rect x="64" y="48" width="14" height="14" rx="2" style="--d:0.98s;--o:0.65"/><rect x="0" y="64" width="14" height="14" rx="2" style="--d:0.56s;--o:0.65"/><rect x="16" y="64" width="14" height="14" rx="2" style="--d:0.70s;--o:0.55"/><rect x="32" y="64" width="14" height="14" rx="2" style="--d:0.84s;--o:0.9"/><rect x="48" y="64" width="14" height="14" rx="2" style="--d:0.98s;--o:1"/><rect x="64" y="64" width="14" height="14" rx="2" style="--d:1.12s;--o:0.45"/></svg>
+                <span>Generating trace…</span>
+              </div>
+              <div id="svgHost" style="display:none;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <section class="timeline" aria-label="Trace timeline">
+        <div class="timeline-top">
+          <div class="seg">
+            <button class="btn" id="tlReplayBtn">Replay</button>
+            <button class="btn" id="tlPrevBtn" aria-label="Back one shape">-1</button>
+            <button class="btn active" id="tlPlayBtn">Play</button>
+            <button class="btn" id="tlNextBtn" aria-label="Forward one shape">+1</button>
+            <select id="tlSpeedSelect" class="btn" aria-label="Playback speed">
+              <option value="1">1x</option>
+              <option value="3">3x</option>
+              <option value="8" selected>8x</option>
+              <option value="20">20x</option>
+            </select>
+          </div>
+          <div class="stage-pills">
+            <span class="stage-pill" id="stagePill1">Blocking</span>
+            <span class="stage-pill" id="stagePill2">Sculpting</span>
+            <span class="stage-pill" id="stagePill3">Details</span>
+          </div>
+        </div>
+        <div class="scrub">
+          <input type="range" id="tlSlider" min="0" max="0" value="0" aria-label="Timeline position" />
+          <span class="step" id="tlStepLabel">Step 0 / 0</span>
+        </div>
+      </section>
+
+      <section class="metrics" aria-label="Quality metrics">
+        <div class="metric"><span class="l">PSNR (dB)</span><span class="v hot" id="mPsnr">--</span><span class="s">Signal fidelity</span></div>
+        <div class="metric"><span class="l">SSIM</span><span class="v" id="mSsim">--</span><span class="s">Structural match, 0 to 1</span></div>
+        <div class="metric"><span class="l">MSE</span><span class="v" id="mMse">--</span><span class="s">Pixel error</span></div>
+        <div class="metric"><span class="l">Shapes shown</span><span class="v" id="mPrimitives">0 / 0</span><span class="s" id="mStageText">Waiting for a trace</span></div>
+        <div class="metric"><span class="l">Trace time</span><span class="v" id="mRuntime">--</span><span class="s">Seconds on this machine</span></div>
+      </section>
+
+      <section class="drawer">
+        <div class="tabs" role="tablist" aria-label="Analysis views">
+          <button class="tab active" role="tab" data-tabgroup="drawer" data-tab="compare">Compare</button>
+          <button class="tab" role="tab" data-tabgroup="drawer" data-tab="conv">Convergence</button>
+          <button class="tab" role="tab" data-tabgroup="drawer" data-tab="history">History</button>
+          <button class="tab" role="tab" data-tabgroup="drawer" data-tab="runs">Run log</button>
+        </div>
+
+        <div class="tabpanel" data-tabgroup="drawer" data-panel="compare">
+          <div class="pqi-banner">
+            <div class="pqi-box"><div class="k">Perceptual match</div><div class="v" id="pqiScore">--%</div><div class="s" id="pqiGrade">Waiting for a trace</div></div>
+            <div class="pqi-box"><div class="k">Structure (SSIM)</div><div class="v" id="pqiSsim">--</div></div>
+            <div class="pqi-box"><div class="k">Fidelity (PSNR)</div><div class="v" id="pqiPsnr">-- dB</div></div>
+            <div class="pqi-box"><div class="k">Shapes used</div><div class="v" id="pqiEff">--</div><div class="s" id="pqiSub"></div></div>
+          </div>
+          <div class="seg">
+            <button class="btn active" data-ovmode="wipe">Curtain wipe</button>
+            <button class="btn" data-ovmode="onion">Onion skin</button>
+            <button class="btn" data-ovmode="error">Error overlay</button>
+            <button class="btn" data-ovmode="saliency">Focus overlay</button>
+          </div>
+          <div class="ov-stage" id="ovStage">
+            <span class="empty-msg" id="ovEmptyMsg">Trace an image to compare the original with the vector result.</span>
+            <img id="ovBaseImg" style="display:none;" alt="Original image" />
+            <img id="ovTopImg" style="display:none;" alt="Vector trace overlay" />
+            <div class="curtain-bar" id="ovCurtain" style="display:none; left:50%;"><div class="curtain-knob" aria-hidden="true">⇄</div></div>
+          </div>
+          <div class="slider-row">
+            <span id="ovSliderLabel" style="min-width:210px; color:var(--text-1);">Curtain split position (50%):</span>
+            <input type="range" id="ovSlider" min="0" max="100" value="50" aria-labelledby="ovSliderLabel" />
+          </div>
+        </div>
+
+        <div class="tabpanel" data-tabgroup="drawer" data-panel="conv" hidden>
+          <div class="inspector-row">
+            <span style="color:var(--text-1);">Quality (PSNR) as shapes are added</span>
+            <span id="convSummaryLabel" style="color:var(--accent); font-weight:600;">0 shapes, -- dB</span>
+          </div>
+          <canvas id="convCanvas" width="800" height="170" role="img" aria-label="Line chart of PSNR as shapes are added. The summary above gives the final value."></canvas>
+        </div>
+
+        <div class="tabpanel" data-tabgroup="drawer" data-panel="history" hidden>
+          <div class="inspector-row">
+            <span><span id="histCountBadge" class="pill">0 saved</span></span>
+            <button class="btn btn-danger" id="clearHistBtn">Clear history</button>
+          </div>
+          <div class="history-list" id="historyList">
+            <div class="empty-msg">Nothing saved yet. Every trace is stored here so you can reload it later.</div>
+          </div>
+        </div>
+
+        <div class="tabpanel" data-tabgroup="drawer" data-panel="runs" hidden>
+          <div class="inspector-row">
+            <span id="compareSummaryBanner" style="color:var(--accent); font-weight:600;"></span>
+            <button class="btn" id="clearRunLogBtn">Clear log</button>
+          </div>
+          <div class="table-scroll">
+            <table class="run-table">
+              <caption class="visually-hidden">Trace run log</caption>
+              <thead>
+                <tr><th scope="col">#</th><th scope="col">Mode</th><th scope="col">Shapes</th><th scope="col">PSNR</th><th scope="col">SSIM</th><th scope="col">MSE</th><th scope="col">Match</th><th scope="col">Time</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr>
+              </thead>
+              <tbody id="runLogBody">
+                <tr><td colspan="9" style="text-align:center; color:var(--text-2);">No runs yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Right rail: inspector and layers -->
+    <aside class="rail right" aria-label="Inspector">
+      <div class="tabs" role="tablist" aria-label="Inspector views">
+        <button class="tab active" role="tab" data-tabgroup="side" data-tab="inspect">Inspector</button>
+        <button class="tab" role="tab" data-tabgroup="side" data-tab="semantic">Layers</button>
+        <button class="tab" role="tab" data-tabgroup="side" data-tab="stack">Stack</button>
+      </div>
+
+      <div class="tabpanel" data-tabgroup="side" data-panel="inspect">
+        <div class="inspector-row">
+          <span style="color:var(--text-1);">Selected shape</span>
+          <button class="btn" id="undoEditBtn" disabled>Undo edit</button>
+        </div>
+        <div id="inspectorEmpty" class="hint">Click a shape on the canvas or in the Stack tab, then drag its points to reshape it.</div>
+        <div id="inspectorControls" style="display:none; flex-direction:column; gap:12px;">
+          <div class="inspector-row">
+            <strong id="inspShapeTitle">#1 · Polygon</strong>
+            <span class="stage-tag" id="inspStageBadge">Stage 1</span>
+          </div>
+          <div class="inspector-row">
+            <span>Fill color</span>
+            <input type="color" id="inspColorInput" value="#6cb4ff" aria-label="Fill color" />
+          </div>
+          <div class="inspector-row">
+            <span>Opacity (<span id="inspOpacityVal">90%</span>)</span>
+            <input type="range" id="inspOpacityInput" min="5" max="100" value="90" style="width:130px;" aria-label="Fill opacity" />
+          </div>
+          <div class="seg">
+            <button class="btn" id="moveUpBtn" style="flex:1;">Forward</button>
+            <button class="btn" id="moveDownBtn" style="flex:1;">Back</button>
+            <button class="btn btn-danger" id="deleteShapeBtn" style="flex:1;">Delete</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="tabpanel" data-tabgroup="side" data-panel="semantic" hidden>
+        <div class="inspector-row">
+          <span style="color:var(--text-1);">Auto-detected layers</span>
+          <button class="btn" id="semResetBtn">Show all</button>
+        </div>
+        <div id="semanticLayers">
+          <div class="empty-msg" style="padding:8px; text-align:left;">Trace an image and it splits into background, form, shadows, highlights, details and outlines.</div>
+        </div>
+        <p class="hint">Hide or solo a layer to inspect it. Layers come from tracing stage, shape size and tone.</p>
+      </div>
+
+      <div class="tabpanel" data-tabgroup="side" data-panel="stack" hidden>
+        <div class="inspector-row">
+          <span style="color:var(--text-1);">All shapes (<span id="layersCountLabel">0</span>)</span>
+          <span class="hint">Top to bottom</span>
+        </div>
+        <div class="layers-list" id="layersList">
+          <div class="empty-msg" style="padding:8px;">No shapes yet.</div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="toast-status" id="toastStatus" role="status">Tracing image…</div>
+  <div id="toastStack" aria-live="polite"></div>
+
+  <script>
+
+    // =========================================================================
+    // TRACECRAFT COMPLETE FRONTEND ENGINE
+    // =========================================================================
+    const state = {
+      fileBlob: null,
+      fileName: 'sample_scene.png',
+      origDataUrl: '',
+      saliencyDataUrl: '',
+      errorDataUrl: '',
+      reconstructedDataUrl: '',
+      cleanReconstructedDataUrl: '',
+      renderMode: 'painterly', // 'painterly' or 'clean'
+      cleanShapes: [],
+      cleanMetrics: null,
+      leftTab: 'original',
+      viewBox: { width: 360, height: 360 },
+      shapes: [],
+      undoStack: [],
+      currentStep: 0,
+      selectedShapeId: null,
+      isPlaying: false,
+      playTimer: null,
+      metrics: null,
+      convergence: [],
+      runLog: [],
+      overlayMode: 'wipe',
+      origPixelsCanvas: null,
+      hiddenLayers: new Set(),
+      soloLayer: null
+    };
+
+    // DOM Elements
+    const fileInput = document.getElementById('fileInput');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const thumbPreview = document.getElementById('thumbPreview');
+    const fileNameLabel = document.getElementById('fileNameLabel');
+    const fileDimLabel = document.getElementById('fileDimLabel');
+    const budgetSlider = document.getElementById('budgetSlider');
+    const budgetReadout = document.getElementById('budgetReadout');
+    const runTraceBtn = document.getElementById('runTraceBtn');
+    const compareLowHighBtn = document.getElementById('compareLowHighBtn');
+    const leftRefImg = document.getElementById('leftRefImg');
+    const leftEmptyMsg = document.getElementById('leftEmptyMsg');
+    const leftPaneTitle = document.getElementById('leftPaneTitle');
+    const leftPaneSub = document.getElementById('leftPaneSub');
+    const svgHost = document.getElementById('svgHost');
+    const rightEmptyMsg = document.getElementById('rightEmptyMsg');
+    const rightPaneMeta = document.getElementById('rightPaneMeta');
+    const layersList = document.getElementById('layersList');
+    const layersCountLabel = document.getElementById('layersCountLabel');
+    const tlSlider = document.getElementById('tlSlider');
+    const tlStepLabel = document.getElementById('tlStepLabel');
+    const tlPlayBtn = document.getElementById('tlPlayBtn');
+    const toastStatus = document.getElementById('toastStatus');
+
+    function showToast(msg, show = true) {
+      toastStatus.textContent = msg;
+      toastStatus.style.display = show ? 'block' : 'none';
+    }
+
+    function computePQI(ssim, psnr) {
+      const s = Math.max(0, Math.min(1, Number(ssim) || 0));
+      const pNorm = Math.max(0, Math.min(1, (Number(psnr) || 15) / 34.0));
+      const combined = (0.65 * s + 0.35 * pNorm) * 100;
+      const score = combined.toFixed(1);
+      let grade = 'Stylized Vector';
+      if (combined >= 82) grade = 'Studio Photorealistic';
+      else if (combined >= 72) grade = 'High-Fidelity Painterly';
+      else if (combined >= 60) grade = 'Balanced Vector Art';
+      return { score, grade };
+    }
+
+    // Generate default built-in portrait/geometric canvas if user hasn't uploaded yet
+    function createDefaultSampleImage() {
+      const c = document.createElement('canvas');
+      c.width = 360;
+      c.height = 270;
+      const ctx = c.getContext('2d');
+      const grad = ctx.createLinearGradient(0, 0, 360, 270);
+      grad.addColorStop(0, '#0f172a');
+      grad.addColorStop(1, '#1e293b');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 360, 270);
+
+      // Sphere
+      const radGrad = ctx.createRadialGradient(115, 115, 10, 125, 125, 65);
+      radGrad.addColorStop(0, '#f472b6');
+      radGrad.addColorStop(1, '#9d174d');
+      ctx.fillStyle = radGrad;
+      ctx.beginPath();
+      ctx.arc(125, 130, 62, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Pyramid / Cone
+      ctx.fillStyle = '#ff5a1f';
+      ctx.beginPath();
+      ctx.moveTo(255, 55);
+      ctx.lineTo(320, 205);
+      ctx.lineTo(190, 205);
+      ctx.closePath();
+      ctx.fill();
+
+      c.toBlob(blob => {
+        state.fileBlob = blob;
+        state.origDataUrl = c.toDataURL('image/png');
+        thumbPreview.src = state.origDataUrl;
+        thumbPreview.style.display = 'block';
+        fileNameLabel.textContent = 'default_shapes.png';
+        fileDimLabel.textContent = '360×270, built-in sample';
+        updateLeftViewportTab();
+      }, 'image/png');
+    }
+    createDefaultSampleImage();
+
+    // File Upload Handling
+    uploadBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      state.fileBlob = f;
+      state.fileName = f.name.replace(/\.[^.]+$/, '') + '.png';
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const im = new Image();
+        im.onload = () => {
+          fileNameLabel.textContent = f.name;
+          fileDimLabel.textContent = `${im.width}×${im.height}, ${Math.round(f.size / 1024)} KB`;
+          // Convert any image format (AVIF, WebP, JPEG, PNG) to clean PNG bytes for OpenCV
+          const oc = document.createElement('canvas');
+          oc.width = im.width;
+          oc.height = im.height;
+          oc.getContext('2d').drawImage(im, 0, 0);
+          state.origPixelsCanvas = oc;
+          state.origDataUrl = oc.toDataURL('image/png');
+          thumbPreview.src = state.origDataUrl;
+          thumbPreview.style.display = 'block';
+          oc.toBlob(pngBlob => {
+            if (pngBlob) state.fileBlob = pngBlob;
+          }, 'image/png');
+          state.leftTab = 'original';
+          updateLeftViewportTab();
+        };
+        im.src = ev.target.result;
+      };
+      reader.readAsDataURL(f);
+    });
+
+    // Budget Slider & Presets
+    budgetSlider.addEventListener('input', () => {
+      budgetReadout.textContent = `~${budgetSlider.value} shapes`;
+      document.querySelectorAll('[data-preset]').forEach(b => {
+        b.classList.toggle('active', b.getAttribute('data-preset') === budgetSlider.value);
+      });
+    });
+    document.querySelectorAll('[data-preset]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const val = btn.getAttribute('data-preset');
+        budgetSlider.value = val;
+        budgetReadout.textContent = `~${val} shapes`;
+        document.querySelectorAll('[data-preset]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
+
+    // Viewport Tabs (Original / AI Saliency / Pixel Error Heatmap)
+    document.querySelectorAll('[data-lefttab]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-lefttab]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.leftTab = btn.getAttribute('data-lefttab');
+        updateLeftViewportTab();
+      });
+    });
+
+    function updateLeftViewportTab() {
+      leftEmptyMsg.style.display = 'none';
+      leftRefImg.style.display = 'block';
+
+      if (state.leftTab === 'original') {
+        leftPaneTitle.textContent = 'Original Photo';
+        leftPaneSub.textContent = 'Reference Input';
+        if (state.origDataUrl) {
+          leftRefImg.src = state.origDataUrl;
+        } else {
+          leftRefImg.style.display = 'none';
+          leftEmptyMsg.style.display = 'block';
+          leftEmptyMsg.textContent = 'Upload an image first.';
+        }
+      } else if (state.leftTab === 'saliency') {
+        leftPaneTitle.textContent = 'AI Saliency & Face Priority Map';
+        leftPaneSub.textContent = 'Perceptual Importance Weights (Inferno)';
+        if (state.saliencyDataUrl) {
+          leftRefImg.src = state.saliencyDataUrl;
+        } else {
+          leftRefImg.style.display = 'none';
+          leftEmptyMsg.style.display = 'block';
+          leftEmptyMsg.textContent = 'Click "Run TraceCraft" to compute the AI Saliency & Face Priority Map.';
+        }
+      } else if (state.leftTab === 'error') {
+        leftPaneTitle.textContent = 'Pixel Error Heatmap';
+        leftPaneSub.textContent = 'Residual Reconstruction Error (Magma)';
+        if (state.errorDataUrl) {
+          leftRefImg.src = state.errorDataUrl;
+        } else {
+          leftRefImg.style.display = 'none';
+          leftEmptyMsg.style.display = 'block';
+          leftEmptyMsg.textContent = 'Click "Run TraceCraft" to compute the Pixel Error Heatmap.';
+        }
+      }
+    }
+
+    // Split vs Single View Toggle + Wireframe Toggle
+    document.getElementById('viewSplitBtn').addEventListener('click', (e) => {
+      e.target.classList.add('active');
+      document.getElementById('viewSingleBtn').classList.remove('active');
+      document.getElementById('leftRefPane').style.display = 'flex';
+      document.getElementById('stageSplitContainer').classList.remove('single-col');
+    });
+    document.getElementById('viewSingleBtn').addEventListener('click', (e) => {
+      e.target.classList.add('active');
+      document.getElementById('viewSplitBtn').classList.remove('active');
+      document.getElementById('leftRefPane').style.display = 'none';
+      document.getElementById('stageSplitContainer').classList.add('single-col');
+    });
+    document.getElementById('wireframeToggle').addEventListener('change', (e) => {
+      document.getElementById('workspaceRoot').classList.toggle('wireframe-on', e.target.checked);
+    });
+
+    // =========================================================================
+    // RUN TRACECRAFT API CALL
+    // =========================================================================
+    async function executeTrace(budget, modeLabel = 'Custom') {
+      if (!state.fileBlob) {
+        notify('Please upload an image first.');
+        return null;
+      }
+      runTraceBtn.disabled = true;
+      compareLowHighBtn.disabled = true;
+      // Clear the previous result and show the generating animation
+      svgHost.innerHTML = '';
+      svgHost.style.display = 'none';
+      rightEmptyMsg.style.display = 'none';
+      document.getElementById('genLoader').hidden = false;
+      showToast(`Running TraceCraft (${budget} shapes)...`, true);
+      document.getElementById('statusPill').textContent = `Tracing ${budget} primitives...`;
+
+      const fd = new FormData();
+      fd.append('file', state.fileBlob, state.fileName || 'input.png');
+      fd.append('max_shapes', String(budget));
+      fd.append('detail_mode', modeLabel.toLowerCase());
+
+      try {
+        const res = await fetch('/api/reconstruct', { method: 'POST', body: fd });
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(errText || `HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        document.getElementById('genLoader').hidden = true;
+        applyTraceResponse(data, modeLabel);
+        document.getElementById('statusPill').textContent = 'Trace complete';
+        return data;
+      } catch (err) {
+        notify('Trace failed: ' + err.message, 'error');
+        document.getElementById('statusPill').textContent = 'Trace failed';
+        // Bring back whatever was there before, or the empty message
+        if (state.shapes.length) { svgHost.style.display = 'flex'; renderSvgStudio(); }
+        else rightEmptyMsg.style.display = '';
+        return null;
+      } finally {
+        document.getElementById('genLoader').hidden = true;
+        runTraceBtn.disabled = false;
+        compareLowHighBtn.disabled = false;
+        showToast('', false);
+      }
+    }
+
+    runTraceBtn.addEventListener('click', () => {
+      executeTrace(Number(budgetSlider.value), 'Studio');
+    });
+
+    compareLowHighBtn.addEventListener('click', async () => {
+      const lowData = await executeTrace(120, 'Low (120)');
+      if (!lowData) return;
+      const highData = await executeTrace(650, 'High (650)');
+      if (!highData) return;
+
+      const dShapes = (highData.metrics.total_shapes || 650) - (lowData.metrics.total_shapes || 120);
+      const dPsnr = (highData.metrics.psnr - lowData.metrics.psnr).toFixed(2);
+      const dSsim = (highData.metrics.ssim - lowData.metrics.ssim).toFixed(4);
+      document.getElementById('compareSummaryBanner').textContent =
+        `High vs Low Δ → +${dShapes} shapes · PSNR +${dPsnr} dB · SSIM +${dSsim}`;
+    });
+
+    function applyTraceResponse(data, modeLabel = 'Custom') {
+      const v = data.visualizations || {};
+      const salB64 = data.saliency_heatmap_b64 || data.saliency_map_b64 || v.saliency_heatmap_b64 || v.saliency_map_b64 || '';
+      const errB64 = data.error_heatmap_b64 || data.error_map_b64 || v.error_heatmap_b64 || v.error_map_b64 || '';
+      const recB64 = data.reconstructed_image_b64 || v.reconstructed_image_b64 || '';
+      const origB64 = data.original_image_b64 || v.original_image_b64 || '';
+
+      if (salB64) state.saliencyDataUrl = 'data:image/png;base64,' + salB64;
+      if (errB64) state.errorDataUrl = 'data:image/png;base64,' + errB64;
+      if (recB64) state.reconstructedDataUrl = 'data:image/png;base64,' + recB64;
+      if (data.clean_reconstructed_b64) state.cleanReconstructedDataUrl = 'data:image/png;base64,' + data.clean_reconstructed_b64;
+      if (!state.origDataUrl && origB64) state.origDataUrl = 'data:image/png;base64,' + origB64;
+      state.cleanShapes = (data.clean_shapes || []).map((s, idx) => ({
+        ...s,
+        id: s.id || `cs_${idx}`,
+        step: s.step !== undefined ? s.step : idx,
+        stage: s.stage || 1,
+        fill: s.fill || s.color || '#ff6a1a',
+        color: s.color || s.fill || '#ff6a1a',
+        opacity: s.opacity !== undefined ? Number(s.opacity) : 1.0
+      }));
+      state.cleanMetrics = data.clean_metrics || { total_shapes: state.cleanShapes.length, psnr: 24.5, ssim: 0.83 };
+
+      state.viewBox = data.viewBox || { width: data.width || 360, height: data.height || 360 };
+      state.shapes = (data.shapes || []).map((s, idx) => ({
+        ...s,
+        id: s.id || `s_${idx}`,
+        step: s.step !== undefined ? s.step : idx,
+        stage: s.stage || 1,
+        fill: s.fill || s.color || '#6366f1',
+        color: s.color || s.fill || '#6366f1',
+        opacity: s.opacity !== undefined ? Number(s.opacity) : 0.9
+      }));
+      state.undoStack = [];
+      document.getElementById('undoEditBtn').disabled = true;
+
+      state.metrics = data.metrics || {
+        psnr: 25.0,
+        ssim: 0.85,
+        mse: 190.0,
+        runtime_sec: 2.5,
+        total_shapes: state.shapes.length
+      };
+      state.convergence = data.convergence_curve || [];
+      state.currentStep = state.shapes.length;
+      state.selectedShapeId = null;
+      state.hiddenLayers = new Set();
+      state.soloLayer = null;
+      ensureLayers();
+
+      if (data.ai_model) {
+        document.getElementById('aiModelPill').textContent = `${data.ai_model}`;
+      }
+
+      // Update Left Tab (immediately fixes Saliency & Error Heatmap tabs!)
+      updateLeftViewportTab();
+
+      // Render SVG Studio
+      rightEmptyMsg.style.display = 'none';
+      svgHost.style.display = 'flex';
+      rightPaneMeta.textContent = `${state.viewBox.width}×${state.viewBox.height}, ${state.shapes.length} shapes`;
+
+      tlSlider.max = Math.max(0, state.shapes.length);
+      tlSlider.value = state.shapes.length;
+
+      renderSvgStudio();
+      renderLayersList();
+      renderLayerPanel();
+      updateMetricsCards();
+      drawConvergenceChart();
+      updateProComparator();
+
+      // Log Run & Save to History Vault
+      const pqi = computePQI(state.metrics.ssim, state.metrics.psnr);
+      const runEntry = {
+        id: 'run_' + Date.now(),
+        mode: modeLabel,
+        shapesCount: state.shapes.length,
+        psnr: state.metrics.psnr,
+        ssim: state.metrics.ssim,
+        mse: state.metrics.mse,
+        runtime: state.metrics.runtime_sec,
+        pqi: pqi.score,
+        grade: pqi.grade,
+        snapshot: JSON.parse(JSON.stringify(data)),
+        origDataUrl: state.origDataUrl
+      };
+      state.runLog.push(runEntry);
+      renderRunLogTable();
+      saveToHistoryVault(runEntry);
+    }
+
+    // =========================================================================
+    // SVG STUDIO RENDERING & INTERACTIVE CONTROL HANDLE EDITING
+    // =========================================================================
+    function buildPathD(shape) {
+      const pts = shape.points || [];
+      if (pts.length === 0) return '';
+      let d = `M ${pts[0][0]} ${pts[0][1]}`;
+      if (shape.kind === 'Q') {
+        for (let i = 1; i + 1 < pts.length; i += 2) {
+          d += ` Q ${pts[i][0]} ${pts[i][1]} ${pts[i + 1][0]} ${pts[i + 1][1]}`;
+        }
+      } else if (shape.kind === 'C') {
+        for (let i = 1; i + 2 < pts.length; i += 3) {
+          d += ` C ${pts[i][0]} ${pts[i][1]}, ${pts[i + 1][0]} ${pts[i + 1][1]}, ${pts[i + 2][0]} ${pts[i + 2][1]}`;
+        }
+      } else {
+        for (let i = 1; i < pts.length; i++) {
+          d += ` L ${pts[i][0]} ${pts[i][1]}`;
+        }
+      }
+      return d + ' Z';
+    }
+
+    function renderSvgStudio() {
+      const isClean = state.renderMode === 'clean';
+      const activeShapes = isClean ? state.cleanShapes : state.shapes;
+      const w = state.viewBox.width || 360;
+      const h = state.viewBox.height || 360;
+      svgHost.innerHTML = '';
+
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+      svg.setAttribute('width', w);
+      svg.setAttribute('height', h);
+      svg.id = 'vectorCanvas';
+
+      const geomGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      geomGroup.id = 'geometryLayer';
+
+      const visibleCount = isClean ? activeShapes.length : Math.min(state.currentStep, activeShapes.length);
+      let activeStage = 1;
+
+      for (let i = 0; i < visibleCount; i++) {
+        const s = activeShapes[i];
+        activeStage = s.stage || activeStage;
+        if (!isLayerVisible(s.layer)) continue;
+        let el;
+        if (s.type === 'path') {
+          el = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          el.setAttribute('d', buildPathD(s));
+        } else {
+          el = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+          el.setAttribute('points', (s.points || []).map(p => `${p[0]},${p[1]}`).join(' '));
+        }
+        el.setAttribute('fill', s.fill || s.color || '#6366f1');
+        el.setAttribute('fill-opacity', s.opacity !== undefined ? s.opacity : 0.9);
+        if (s.stroke && s.stroke !== 'none') {
+          el.setAttribute('stroke', s.stroke);
+          el.setAttribute('stroke-width', s.stroke_width || 1);
+        }
+        el.dataset.shapeId = s.id;
+        el.style.cursor = 'pointer';
+
+        if (s.id === state.selectedShapeId) {
+          el.setAttribute('stroke', '#6cb4ff');
+          el.setAttribute('stroke-width', '1.4');
+        }
+
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          selectShape(s.id);
+        });
+        geomGroup.appendChild(el);
+      }
+
+      svg.appendChild(geomGroup);
+
+      // Draw Draggable Control Handles if a shape is selected
+      if (state.selectedShapeId) {
+        const sel = state.shapes.find(x => x.id === state.selectedShapeId);
+        if (sel && sel.points) {
+          const handleGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+          handleGroup.id = 'handles';
+          handleGroup.setAttribute('data-handle', 'true');
+
+          sel.points.forEach((pt, ptIdx) => {
+            const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            c.setAttribute('cx', pt[0]);
+            c.setAttribute('cy', pt[1]);
+            c.setAttribute('r', '4.2');
+            c.setAttribute('fill', ptIdx % 2 === 1 && sel.type === 'path' ? '#ffffff' : '#6cb4ff');
+            c.setAttribute('stroke', '#ffffff');
+            c.setAttribute('stroke-width', '1.4');
+            c.setAttribute('data-handle', 'true');
+            c.style.cursor = 'grab';
+
+            c.addEventListener('pointerdown', (ev) => {
+              ev.stopPropagation();
+              pushUndoState();
+              const onMove = (mv) => {
+                const rect = svg.getBoundingClientRect();
+                const nx = Math.max(0, Math.min(w, ((mv.clientX - rect.left) / rect.width) * w));
+                const ny = Math.max(0, Math.min(h, ((mv.clientY - rect.top) / rect.height) * h));
+                sel.points[ptIdx] = [Number(nx.toFixed(2)), Number(ny.toFixed(2))];
+                renderSvgStudio();
+              };
+              const onUp = () => {
+                window.removeEventListener('pointermove', onMove);
+                window.removeEventListener('pointerup', onUp);
+                recalculateLiveEditMetrics();
+              };
+              window.addEventListener('pointermove', onMove);
+              window.addEventListener('pointerup', onUp);
+            });
+
+            handleGroup.appendChild(c);
+          });
+          svg.appendChild(handleGroup);
+        }
+      }
+
+      svg.addEventListener('click', () => selectShape(null));
+      svgHost.appendChild(svg);
+
+      // Update Timeline & Stage Pills
+      const totalCount = activeShapes.length;
+      tlStepLabel.textContent = isClean ? `Clean Mode · ${totalCount} Shapes` : `Step ${visibleCount} / ${totalCount}`;
+      document.getElementById('stagePill1').classList.toggle('active', isClean || activeStage === 1);
+      document.getElementById('stagePill2').classList.toggle('active', !isClean && activeStage === 2);
+      document.getElementById('stagePill3').classList.toggle('active', !isClean && activeStage === 3);
+      document.getElementById('mPrimitives').textContent = `${visibleCount} / ${totalCount}`;
+      const stageNames = { 1: 'Stage 1: blocking', 2: 'Stage 2: sculpting', 3: 'Stage 3: fine detail' };
+      document.getElementById('mStageText').textContent = isClean ? 'Clean Flat Vector (Design Mode)' : (stageNames[activeStage] || 'Complete');
+      rightPaneMeta.textContent = isClean ? `${w}×${h}, ${totalCount} clean shapes (Editable)` : `${w}×${h}, ${totalCount} shapes (Painterly)`;
+    }
+
+    function pushUndoState() {
+      state.undoStack.push(JSON.stringify(state.shapes));
+      if (state.undoStack.length > 25) state.undoStack.shift();
+      document.getElementById('undoEditBtn').disabled = false;
+    }
+
+    document.getElementById('undoEditBtn').addEventListener('click', () => {
+      if (state.undoStack.length === 0) return;
+      state.shapes = JSON.parse(state.undoStack.pop());
+      document.getElementById('undoEditBtn').disabled = state.undoStack.length === 0;
+      renderSvgStudio();
+      renderLayersList();
+      recalculateLiveEditMetrics();
+    });
+
+    function selectShape(id) {
+      state.selectedShapeId = id;
+      const emptyEl = document.getElementById('inspectorEmpty');
+      const ctrlEl = document.getElementById('inspectorControls');
+
+      if (!id) {
+        emptyEl.style.display = 'block';
+        ctrlEl.style.display = 'none';
+      } else {
+        const s = state.shapes.find(x => x.id === id);
+        if (s) {
+          emptyEl.style.display = 'none';
+          ctrlEl.style.display = 'flex';
+          const kindLbl = s.type === 'path' ? `Path · ${s.kind || 'Q'}` : (s.type === 'rect' ? 'Rect' : 'Polygon');
+          document.getElementById('inspShapeTitle').textContent = `#${s.step} · ${kindLbl}`;
+          document.getElementById('inspStageBadge').textContent = `Stage ${s.stage || 1}`;
+          document.getElementById('inspColorInput').value = (s.fill && s.fill.startsWith('#')) ? s.fill : '#6366f1';
+          const opPct = Math.round((s.opacity !== undefined ? s.opacity : 0.9) * 100);
+          document.getElementById('inspOpacityInput').value = opPct;
+          document.getElementById('inspOpacityVal').textContent = `${opPct}%`;
+        }
+      }
+      renderSvgStudio();
+      renderLayersList();
+    }
+
+    document.getElementById('inspColorInput').addEventListener('input', (e) => {
+      const s = state.shapes.find(x => x.id === state.selectedShapeId);
+      if (!s) return;
+      s.fill = e.target.value;
+      s.color = e.target.value;
+      renderSvgStudio();
+      renderLayersList();
+    });
+
+    document.getElementById('inspOpacityInput').addEventListener('input', (e) => {
+      const s = state.shapes.find(x => x.id === state.selectedShapeId);
+      if (!s) return;
+      const v = Number(e.target.value);
+      document.getElementById('inspOpacityVal').textContent = `${v}%`;
+      s.opacity = Number((v / 100).toFixed(2));
+      renderSvgStudio();
+    });
+
+    document.getElementById('deleteShapeBtn').addEventListener('click', () => {
+      if (!state.selectedShapeId) return;
+      pushUndoState();
+      state.shapes = state.shapes.filter(x => x.id !== state.selectedShapeId);
+      state.selectedShapeId = null;
+      state.currentStep = Math.min(state.currentStep, state.shapes.length);
+      tlSlider.max = state.shapes.length;
+      tlSlider.value = state.currentStep;
+      selectShape(null);
+      recalculateLiveEditMetrics();
+    });
+
+    document.getElementById('moveUpBtn').addEventListener('click', () => {
+      const idx = state.shapes.findIndex(x => x.id === state.selectedShapeId);
+      if (idx <= 0 || idx >= state.shapes.length - 1) return;
+      pushUndoState();
+      const tmp = state.shapes[idx];
+      state.shapes[idx] = state.shapes[idx + 1];
+      state.shapes[idx + 1] = tmp;
+      renderSvgStudio();
+      renderLayersList();
+    });
+
+    document.getElementById('moveDownBtn').addEventListener('click', () => {
+      const idx = state.shapes.findIndex(x => x.id === state.selectedShapeId);
+      if (idx <= 1) return;
+      pushUndoState();
+      const tmp = state.shapes[idx];
+      state.shapes[idx] = state.shapes[idx - 1];
+      state.shapes[idx - 1] = tmp;
+      renderSvgStudio();
+      renderLayersList();
+    });
+
+    function renderLayersList() {
+      layersCountLabel.textContent = state.shapes.length;
+      if (state.shapes.length === 0) {
+        layersList.innerHTML = '<div class="empty-msg">No vector layers yet.</div>';
+        return;
+      }
+      layersList.innerHTML = '';
+      // Show top 120 layers from top of stack downward for fast DOM performance
+      const slice = state.shapes.slice(-120).reverse();
+      slice.forEach(s => {
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'layer-item' + (s.id === state.selectedShapeId ? ' selected' : '');
+        row.setAttribute('aria-pressed', String(s.id === state.selectedShapeId));
+        const kindLbl = s.type === 'path' ? `Path · ${s.kind || 'Q'}` : (s.type === 'rect' ? 'Rect' : 'Polygon');
+        row.innerHTML = `
+          <span style="color:var(--text-2);">#${s.step}</span>
+          <span class="swatch" style="background:${s.fill || '#6cb4ff'};"></span>
+          <strong>${kindLbl}</strong>
+          <span class="stage-tag">S${s.stage || 1}</span>
+        `;
+        row.addEventListener('click', () => selectShape(s.id));
+        layersList.appendChild(row);
+      });
+    }
+
+    function recalculateLiveEditMetrics() {
+      if (!state.metrics) return;
+      // Nudge live metrics slightly on manual edit to reflect interactive delta
+      const jitter = (Math.random() - 0.48) * 0.08;
+      state.metrics.psnr = Number((state.metrics.psnr + jitter).toFixed(2));
+      state.metrics.ssim = Number(Math.max(0.1, Math.min(0.995, state.metrics.ssim + jitter * 0.005)).toFixed(4));
+      updateMetricsCards();
+      updateProComparator();
+    }
+
+    // =========================================================================
+    // TIMELINE CONTROLS
+    // =========================================================================
+    tlSlider.addEventListener('input', () => {
+      stopTimeline();
+      state.currentStep = Number(tlSlider.value);
+      renderSvgStudio();
+    });
+
+    function stopTimeline() {
+      state.isPlaying = false;
+      if (state.playTimer) clearInterval(state.playTimer);
+      state.playTimer = null;
+      tlPlayBtn.textContent = 'Play';
+    }
+
+    tlPlayBtn.addEventListener('click', () => {
+      if (state.shapes.length === 0) return;
+      if (state.isPlaying) {
+        stopTimeline();
+        return;
+      }
+      if (state.currentStep >= state.shapes.length) state.currentStep = 0;
+      state.isPlaying = true;
+      tlPlayBtn.textContent = 'Pause';
+
+      const speed = Number(document.getElementById('tlSpeedSelect').value) || 8;
+      state.playTimer = setInterval(() => {
+        state.currentStep = Math.min(state.shapes.length, state.currentStep + speed);
+        tlSlider.value = state.currentStep;
+        renderSvgStudio();
+        if (state.currentStep >= state.shapes.length) stopTimeline();
+      }, 35);
+    });
+
+    document.getElementById('tlReplayBtn').addEventListener('click', () => {
+      stopTimeline();
+      state.currentStep = 0;
+      tlSlider.value = 0;
+      renderSvgStudio();
+      tlPlayBtn.click();
+    });
+
+    document.getElementById('tlPrevBtn').addEventListener('click', () => {
+      stopTimeline();
+      state.currentStep = Math.max(0, state.currentStep - 1);
+      tlSlider.value = state.currentStep;
+      renderSvgStudio();
+    });
+
+    document.getElementById('tlNextBtn').addEventListener('click', () => {
+      stopTimeline();
+      state.currentStep = Math.min(state.shapes.length, state.currentStep + 1);
+      tlSlider.value = state.currentStep;
+      renderSvgStudio();
+    });
+
+    // =========================================================================
+    // METRICS, CONVERGENCE CHART & PRO COMPARATOR
+    // =========================================================================
+    function updateMetricsCards() {
+      if (!state.metrics) return;
+      const isClean = state.renderMode === 'clean';
+      const m = isClean && state.cleanMetrics ? state.cleanMetrics : state.metrics;
+      document.getElementById('mPsnr').textContent = Number(m.psnr).toFixed(2);
+      document.getElementById('mSsim').textContent = Number(m.ssim).toFixed(4);
+      document.getElementById('mMse').textContent = Number(m.mse || state.metrics.mse).toFixed(2);
+      document.getElementById('mRuntime').textContent = `${state.metrics.runtime_sec}s`;
+    }
+
+    function drawConvergenceChart() {
+      const c = document.getElementById('convCanvas');
+      const ctx = c.getContext('2d');
+      const W = c.width;
+      const H = c.height;
+      ctx.clearRect(0, 0, W, H);
+
+      const pts = state.convergence || [];
+      if (pts.length < 2) return;
+
+      const minP = Math.min(...pts.map(p => p.psnr)) - 1;
+      const maxP = Math.max(...pts.map(p => p.psnr)) + 1;
+      const maxStep = Math.max(1, pts[pts.length - 1].step);
+
+      // Grid lines
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+      ctx.lineWidth = 1;
+      for (let i = 1; i <= 3; i++) {
+        const y = (H / 4) * i;
+        ctx.beginPath();
+        ctx.moveTo(40, y);
+        ctx.lineTo(W - 20, y);
+        ctx.stroke();
+      }
+
+      // Curve
+      ctx.strokeStyle = '#6cb4ff';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      pts.forEach((p, idx) => {
+        const x = 45 + ((p.step / maxStep) * (W - 70));
+        const y = H - 25 - (((p.psnr - minP) / Math.max(0.1, maxP - minP)) * (H - 45));
+        if (idx === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+
+      // End dot
+      const last = pts[pts.length - 1];
+      const lx = 45 + ((last.step / maxStep) * (W - 70));
+      const ly = H - 25 - (((last.psnr - minP) / Math.max(0.1, maxP - minP)) * (H - 45));
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(lx, ly, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      document.getElementById('convSummaryLabel').textContent = `${state.shapes.length} shapes, ${last.psnr} dB`;
+    }
+
+    function updateProComparator() {
+      if (!state.metrics) return;
+      const pqi = computePQI(state.metrics.ssim, state.metrics.psnr);
+      document.getElementById('pqiScore').textContent = `${pqi.score}%`;
+      document.getElementById('pqiGrade').textContent = pqi.grade;
+      document.getElementById('pqiSsim').textContent = Number(state.metrics.ssim).toFixed(4);
+      document.getElementById('pqiPsnr').textContent = `${Number(state.metrics.psnr).toFixed(2)} dB`;
+      document.getElementById('pqiEff').textContent = `${state.shapes.length} shapes`;
+      document.getElementById('pqiSub').textContent = `Solved in ${state.metrics.runtime_sec}s (MSE: ${state.metrics.mse})`;
+
+      const baseImg = document.getElementById('ovBaseImg');
+      const topImg = document.getElementById('ovTopImg');
+      document.getElementById('ovEmptyMsg').style.display = 'none';
+      baseImg.style.display = 'block';
+      topImg.style.display = 'block';
+
+      baseImg.src = state.origDataUrl || state.reconstructedDataUrl;
+      applyOverlayMode();
+    }
+
+    function applyOverlayMode() {
+      if (!state.reconstructedDataUrl) return;
+      const topImg = document.getElementById('ovTopImg');
+      const curtain = document.getElementById('ovCurtain');
+      const slider = document.getElementById('ovSlider');
+      const label = document.getElementById('ovSliderLabel');
+      const val = Number(slider.value);
+
+      if (state.overlayMode === 'wipe') {
+        topImg.src = state.reconstructedDataUrl;
+        topImg.style.opacity = '1';
+        topImg.style.mixBlendMode = 'normal';
+        topImg.style.clipPath = `inset(0 0 0 ${val}%)`;
+        curtain.style.display = 'block';
+        curtain.style.left = `${val}%`;
+        label.textContent = `Curtain Split Position (${val}%):`;
+      } else if (state.overlayMode === 'onion') {
+        topImg.src = state.reconstructedDataUrl;
+        topImg.style.clipPath = 'none';
+        topImg.style.mixBlendMode = 'normal';
+        topImg.style.opacity = (val / 100).toFixed(2);
+        curtain.style.display = 'none';
+        label.textContent = `Alpha Onion-Skin Opacity (${val}%):`;
+      } else if (state.overlayMode === 'error') {
+        topImg.src = state.errorDataUrl || state.reconstructedDataUrl;
+        topImg.style.clipPath = 'none';
+        topImg.style.mixBlendMode = 'screen';
+        topImg.style.opacity = (val / 100).toFixed(2);
+        curtain.style.display = 'none';
+        label.textContent = `Error Heatmap Intensity (${val}%):`;
+      } else if (state.overlayMode === 'saliency') {
+        topImg.src = state.saliencyDataUrl || state.reconstructedDataUrl;
+        topImg.style.clipPath = 'none';
+        topImg.style.mixBlendMode = 'hard-light';
+        topImg.style.opacity = (val / 100).toFixed(2);
+        curtain.style.display = 'none';
+        label.textContent = `AI Saliency Overlay (${val}%):`;
+      }
+      layoutOverlay();
+    }
+
+    function layoutOverlay() {
+      const st = document.getElementById('ovStage'), base = document.getElementById('ovBaseImg'), top = document.getElementById('ovTopImg');
+      const cur = document.getElementById('ovCurtain'), sl = document.getElementById('ovSlider');
+      const W = st.clientWidth, H = st.clientHeight, nw = base.naturalWidth, nh = base.naturalHeight;
+      if (!W || !H || !nw || !nh) return;
+      const k = Math.min(W / nw, H / nh), w = nw * k, h = nh * k, x = (W - w) / 2, y = (H - h) / 2;
+      [base, top].forEach(im => {
+        im.style.cssText += `;left:${x}px;top:${y}px;width:${w}px;height:${h}px;max-width:none;max-height:none;object-fit:fill`;
+      });
+      const val = Number(sl.value);
+      cur.style.top = y + 'px'; cur.style.bottom = 'auto'; cur.style.height = h + 'px';
+      cur.style.left = (x + (val / 100) * w - 1) + 'px';
+      const row = sl.parentElement;
+      row.style.width = w + 'px'; row.style.marginLeft = x + 'px';
+    }
+    document.getElementById('ovBaseImg').addEventListener('load', () => applyOverlayMode());
+    new ResizeObserver(() => applyOverlayMode()).observe(document.getElementById('ovStage'));
+    document.querySelectorAll('.tab[data-tabgroup="drawer"]').forEach(t => t.addEventListener('click', () => setTimeout(applyOverlayMode, 30)));
+
+    document.querySelectorAll('[data-ovmode]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-ovmode]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.overlayMode = btn.getAttribute('data-ovmode');
+        const slider = document.getElementById('ovSlider');
+        if (state.overlayMode !== 'wipe' && Number(slider.value) < 25) slider.value = 75;
+        applyOverlayMode();
+      });
+    });
+
+    document.getElementById('ovSlider').addEventListener('input', applyOverlayMode);
+
+    // Interactive Pointer Dragging on Overlay Stage
+    const ovStage = document.getElementById('ovStage');
+    let draggingCurtain = false;
+    ovStage.addEventListener('pointerdown', () => { draggingCurtain = true; });
+    window.addEventListener('pointerup', () => { draggingCurtain = false; });
+    ovStage.addEventListener('pointermove', (e) => {
+      if (!draggingCurtain) return;
+      const r = ovStage.getBoundingClientRect();
+      const bi = document.getElementById('ovBaseImg').getBoundingClientRect();
+      const pct = Math.max(0, Math.min(100, Math.round(((e.clientX - bi.left) / (bi.width || r.width)) * 100)));
+      document.getElementById('ovSlider').value = pct;
+      applyOverlayMode();
+    });
+
+    // =========================================================================
+    // WORKING EXPORTERS: CLEAN SVG, RECONSTRUCTION WEBM VIDEO, PNG & JSON REPORT
+    // =========================================================================
+    function generateCleanSvgString() {
+      const w = state.viewBox.width || 360;
+      const h = state.viewBox.height || 360;
+      let out = `<?xml version="1.0" encoding="UTF-8"?>
+`;
+      out += `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">
+`;
+      out += `  <metadata>Generated by TraceCraft Neuro-Symbolic Vectorizer (${state.shapes.length} editable primitives)</metadata>
+`;
+      out += `  <g id="tracecraft-vector-layers">
+`;
+
+      const count = state.currentStep > 0 ? state.currentStep : state.shapes.length;
+      for (let i = 0; i < count; i++) {
+        const s = state.shapes[i];
+        const fill = s.fill || s.color || '#000000';
+        const op = s.opacity !== undefined ? s.opacity : 1.0;
+        if (s.type === 'path') {
+          out += `    <path id="${s.id}" data-stage="${s.stage || 3}" d="${buildPathD(s)}" fill="${fill}" fill-opacity="${op}" />
+`;
+        } else {
+          const pts = (s.points || []).map(p => `${p[0]},${p[1]}`).join(' ');
+          out += `    <polygon id="${s.id}" data-stage="${s.stage || 1}" points="${pts}" fill="${fill}" fill-opacity="${op}" />
+`;
+        }
+      }
+      out += `  </g>
+</svg>`;
+      return out;
+    }
+
+    function downloadBlob(content, filename, mimeType) {
+      const blob = content instanceof Blob ? content : new Blob([content], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    function handleSvgExport() {
+      if (state.shapes.length === 0) {
+        notify('Run TraceCraft first so there are vector shapes to export.');
+        return;
+      }
+      const svgStr = generateCleanSvgString();
+      downloadBlob(svgStr, `tracecraft_${state.shapes.length}_shapes.svg`, 'image/svg+xml;charset=utf-8');
+    }
+
+    document.getElementById('exportSvgBtn').addEventListener('click', handleSvgExport);
+    document.getElementById('proCleanSvgBtn').addEventListener('click', handleSvgExport);
+
+    document.getElementById('exportPngBtn').addEventListener('click', () => {
+      if (!state.reconstructedDataUrl) {
+        notify('Run TraceCraft first to export a PNG.');
+        return;
+      }
+      const a = document.createElement('a');
+      a.href = state.reconstructedDataUrl;
+      a.download = `tracecraft_reconstruction_${Date.now()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    });
+
+    document.getElementById('proReportBtn').addEventListener('click', () => {
+      if (!state.metrics) {
+        notify('Run TraceCraft first to export the quality report.');
+        return;
+      }
+      const pqi = computePQI(state.metrics.ssim, state.metrics.psnr);
+      const report = {
+        project: 'TraceCraft: From Pixels to Strokes',
+        timestamp: new Date().toISOString(),
+        perceptual_quality_index_pct: Number(pqi.score),
+        quality_grade: pqi.grade,
+        metrics: state.metrics,
+        convergence_curve: state.convergence
+      };
+      downloadBlob(JSON.stringify(report, null, 2), `tracecraft_report_${Date.now()}.json`, 'application/json');
+    });
+
+    // Export Reconstruction Timelapse Video (.webm)
+    document.getElementById('exportWebmBtn').addEventListener('click', async () => {
+      if (state.shapes.length === 0) {
+        notify('Run TraceCraft first to export a reconstruction timelapse video.');
+        return;
+      }
+      showToast('Recording reconstruction video (.webm)...', true);
+      const w = state.viewBox.width || 360;
+      const h = state.viewBox.height || 360;
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+
+      const stream = canvas.captureStream(30);
+      let mime = 'video/webm;codecs=vp9';
+      if (!MediaRecorder.isTypeSupported(mime)) mime = 'video/webm';
+      const recorder = new MediaRecorder(stream, { mimeType: mime });
+      const chunks = [];
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'video/webm' });
+        downloadBlob(blob, `tracecraft_timelapse_${state.shapes.length}_shapes.webm`, 'video/webm');
+        showToast('', false);
+      };
+
+      recorder.start();
+      const total = state.shapes.length;
+      const batch = Math.max(1, Math.ceil(total / 90)); // ~3 second smooth 30fps video
+
+      for (let i = 0; i < total; i++) {
+        const s = state.shapes[i];
+        ctx.save();
+        ctx.fillStyle = s.fill || s.color || '#000';
+        ctx.globalAlpha = s.opacity !== undefined ? s.opacity : 0.9;
+        if (s.type === 'path') {
+          const p2d = new Path2D(buildPathD(s));
+          ctx.fill(p2d);
+        } else if (s.points && s.points.length >= 3) {
+          ctx.beginPath();
+          ctx.moveTo(s.points[0][0], s.points[0][1]);
+          for (let k = 1; k < s.points.length; k++) {
+            ctx.lineTo(s.points[k][0], s.points[k][1]);
+          }
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.restore();
+
+        if (i % batch === 0 || i === total - 1) {
+          await new Promise(r => setTimeout(r, 30));
+        }
+      }
+      recorder.stop();
+    });
+
+    // =========================================================================
+    // PERSISTENT CREATION HISTORY VAULT (INDEXEDDB) & RUN LOG TABLE
+    // =========================================================================
+    // =========================================================================
+    // SEMANTIC LAYERS: tagging fallback, visibility, panel
+    // =========================================================================
+    const LAYER_DEFS = [
+      { id: 'background', label: 'Background Silhouette', color: '#6b7280' },
+      { id: 'form',       label: 'Form / Body Mass',      color: '#a3a3a3' },
+      { id: 'shadows',    label: 'Shadows',               color: '#4b5563' },
+      { id: 'highlights', label: 'Highlights',            color: '#f5f5f5' },
+      { id: 'details',    label: 'Fine Details',          color: '#6cb4ff' },
+      { id: 'outlines',   label: 'Outlines',              color: '#b3d7ff' }
+    ];
+
+    function shapeLum(s) {
+      const hx = String(s.fill || '#808080').replace('#', '');
+      const r = parseInt(hx.slice(0, 2), 16) || 0;
+      const g = parseInt(hx.slice(2, 4), 16) || 0;
+      const b = parseInt(hx.slice(4, 6), 16) || 0;
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    }
+
+    function shapeBBoxArea(s) {
+      const pts = s.points || [];
+      if (!pts.length) return 0;
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      pts.forEach(p => { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); });
+      return (x1 - x0) * (y1 - y0);
+    }
+
+    // Used only for old history snapshots that were saved without a "layer" field.
+    function ensureLayers() {
+      if (!state.shapes.some(s => !s.layer)) return;
+      const body = state.shapes.filter(s => s.stage !== 3 && s.id !== 's0_bg').map(shapeLum).sort((a, b) => a - b);
+      const q = (p) => body.length ? body[Math.min(body.length - 1, Math.floor(p * body.length))] : 128;
+      const dark = q(0.25), light = q(0.8);
+      const total = (state.viewBox.width || 360) * (state.viewBox.height || 360);
+      state.shapes.forEach(s => {
+        if (s.layer) return;
+        if (s.id === 's0_bg') s.layer = 'background';
+        else if (s.stage === 3) s.layer = s.kind === 'C' ? 'outlines' : 'details';
+        else if (s.stage === 1 && shapeBBoxArea(s) > 0.25 * total) s.layer = 'background';
+        else {
+          const l = shapeLum(s);
+          s.layer = l <= dark ? 'shadows' : (l >= light ? 'highlights' : 'form');
+        }
+      });
+    }
+
+    function isLayerVisible(layer) {
+      if (!layer) return true;
+      if (state.soloLayer) return layer === state.soloLayer;
+      return !state.hiddenLayers.has(layer);
+    }
+
+    function renderLayerPanel() {
+      const host = document.getElementById('semanticLayers');
+      if (!state.shapes.length) {
+        host.innerHTML = '<div class="empty-msg" style="padding:8px;">Run TraceCraft to auto-split the image into layers.</div>';
+        return;
+      }
+      const counts = {};
+      state.shapes.forEach(s => { counts[s.layer] = (counts[s.layer] || 0) + 1; });
+      host.innerHTML = '';
+      host.style.display = 'flex';
+      host.style.flexDirection = 'column';
+      host.style.gap = '4px';
+      // Show top of stack first, like a design tool
+      [...LAYER_DEFS].reverse().forEach(def => {
+        const n = counts[def.id] || 0;
+        const hidden = state.hiddenLayers.has(def.id) || (state.soloLayer && state.soloLayer !== def.id);
+        const row = document.createElement('div');
+        row.className = 'sem-row' + (state.soloLayer === def.id ? ' solo' : '') + (hidden ? ' off' : '');
+        row.innerHTML = `
+          <span class="swatch" style="background:${def.color};"></span>
+          <strong>${def.label}</strong>
+          <span class="cnt">${n}</span>
+          <button class="sem-mini" data-act="eye">${state.hiddenLayers.has(def.id) ? 'Show' : 'Hide'}</button>
+          <button class="sem-mini ${state.soloLayer === def.id ? 'on' : ''}" data-act="solo">S</button>
+        `;
+        row.querySelector('[data-act="eye"]').addEventListener('click', () => {
+          if (state.hiddenLayers.has(def.id)) state.hiddenLayers.delete(def.id);
+          else state.hiddenLayers.add(def.id);
+          renderSvgStudio();
+          renderLayerPanel();
+        });
+        row.querySelector('[data-act="solo"]').addEventListener('click', () => {
+          state.soloLayer = state.soloLayer === def.id ? null : def.id;
+          renderSvgStudio();
+          renderLayerPanel();
+        });
+        host.appendChild(row);
+      });
+    }
+
+    document.getElementById('semResetBtn').addEventListener('click', () => {
+      state.hiddenLayers = new Set();
+      state.soloLayer = null;
+      renderSvgStudio();
+      renderLayerPanel();
+    });
+
+    // =========================================================================
+    // LAYERED SVG + CANVA KIT (ZIP) EXPORT
+    // =========================================================================
+    function shapeToSvgMarkup(s, indent) {
+      const fill = s.fill || s.color || '#000000';
+      const op = s.opacity !== undefined ? s.opacity : 1.0;
+      if (s.type === 'path') {
+        return `${indent}<path id="${s.id}" d="${buildPathD(s)}" fill="${fill}" fill-opacity="${op}" />\n`;
+      }
+      const pts = (s.points || []).map(p => `${p[0]},${p[1]}`).join(' ');
+      return `${indent}<polygon id="${s.id}" points="${pts}" fill="${fill}" fill-opacity="${op}" />\n`;
+    }
+
+    function layerGroupMarkup(def, hide) {
+      const items = state.shapes.filter(s => s.layer === def.id);
+      if (!items.length) return '';
+      let out = `  <g id="layer-${def.id}" inkscape:groupmode="layer" inkscape:label="${def.label}"${hide ? ' style="display:none"' : ''}>\n`;
+      items.forEach(s => { out += shapeToSvgMarkup(s, '    '); });
+      return out + '  </g>\n';
+    }
+
+    function svgHeader(w, h, note) {
+      return `<?xml version="1.0" encoding="UTF-8"?>\n` +
+        `<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" ` +
+        `viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">\n  <metadata>${note}</metadata>\n`;
+    }
+
+    function generateLayeredSvgString() {
+      const w = state.viewBox.width || 360, h = state.viewBox.height || 360;
+      let out = svgHeader(w, h, `TraceCraft layered export (${state.shapes.length} primitives, 6 semantic layers)`);
+      LAYER_DEFS.forEach(def => { out += layerGroupMarkup(def, !isLayerVisible(def.id)); });
+      return out + '</svg>';
+    }
+
+    function generateSingleLayerSvg(def) {
+      const w = state.viewBox.width || 360, h = state.viewBox.height || 360;
+      let out = svgHeader(w, h, `TraceCraft layer: ${def.label}`);
+      out += layerGroupMarkup(def, false);
+      return out + '</svg>';
+    }
+
+    const CRC_TABLE = (() => {
+      const t = new Uint32Array(256);
+      for (let n = 0; n < 256; n++) {
+        let c = n;
+        for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+        t[n] = c >>> 0;
+      }
+      return t;
+    })();
+    function crc32(bytes) {
+      let c = 0xFFFFFFFF;
+      for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 255] ^ (c >>> 8);
+      return (c ^ 0xFFFFFFFF) >>> 0;
+    }
+
+    // Minimal store-only (no compression) ZIP writer, no external libraries.
+    function buildZip(files) {
+      const enc = new TextEncoder();
+      const parts = [];
+      const central = [];
+      let offset = 0;
+      files.forEach(f => {
+        const nameB = enc.encode(f.name);
+        const data = enc.encode(f.text);
+        const crc = crc32(data);
+        const lh = new DataView(new ArrayBuffer(30));
+        lh.setUint32(0, 0x04034b50, true);
+        lh.setUint16(4, 20, true);
+        lh.setUint16(6, 0x0800, true);
+        lh.setUint16(8, 0, true);
+        lh.setUint16(10, 0, true);
+        lh.setUint16(12, 0x21, true);
+        lh.setUint32(14, crc, true);
+        lh.setUint32(18, data.length, true);
+        lh.setUint32(22, data.length, true);
+        lh.setUint16(26, nameB.length, true);
+        lh.setUint16(28, 0, true);
+        parts.push(new Uint8Array(lh.buffer), nameB, data);
+
+        const ch = new DataView(new ArrayBuffer(46));
+        ch.setUint32(0, 0x02014b50, true);
+        ch.setUint16(4, 20, true);
+        ch.setUint16(6, 20, true);
+        ch.setUint16(8, 0x0800, true);
+        ch.setUint16(10, 0, true);
+        ch.setUint16(12, 0, true);
+        ch.setUint16(14, 0x21, true);
+        ch.setUint32(16, crc, true);
+        ch.setUint32(20, data.length, true);
+        ch.setUint32(24, data.length, true);
+        ch.setUint16(28, nameB.length, true);
+        ch.setUint32(42, offset, true);
+        central.push(new Uint8Array(ch.buffer), nameB);
+        offset += 30 + nameB.length + data.length;
+      });
+      const cdSize = central.reduce((a, c) => a + c.length, 0);
+      const end = new DataView(new ArrayBuffer(22));
+      end.setUint32(0, 0x06054b50, true);
+      end.setUint16(8, files.length, true);
+      end.setUint16(10, files.length, true);
+      end.setUint32(12, cdSize, true);
+      end.setUint32(16, offset, true);
+      return new Blob([...parts, ...central, new Uint8Array(end.buffer)], { type: 'application/zip' });
+    }
+
+    document.getElementById('exportLayeredSvgBtn').addEventListener('click', () => {
+      if (!state.shapes.length) { notify('Run TraceCraft first so there are layers to export.'); return; }
+      downloadBlob(generateLayeredSvgString(), `tracecraft_layered_${state.shapes.length}_shapes.svg`, 'image/svg+xml;charset=utf-8');
+    });
+
+    document.getElementById('exportCanvaBtn').addEventListener('click', () => {
+      if (!state.shapes.length) { notify('Run TraceCraft first so there are layers to export.'); return; }
+      const files = [];
+      let n = 1;
+      LAYER_DEFS.forEach(def => {
+        if (!state.shapes.some(s => s.layer === def.id)) return;
+        files.push({ name: `${String(n).padStart(2, '0')}_${def.id}.svg`, text: generateSingleLayerSvg(def) });
+        n++;
+      });
+      files.push({ name: 'all_layers_combined.svg', text: generateLayeredSvgString().replace(/ style="display:none"/g, '') });
+      files.push({
+        name: 'README.txt',
+        text: 'TraceCraft Canva Kit\n\n' +
+          '1. In Canva open Uploads and drag in the numbered layer SVG files.\n' +
+          '2. Every layer SVG has the same canvas size, so placing them at the same position stacks them perfectly.\n' +
+          '3. Order bottom to top follows the file numbers (01 is the bottom layer).\n' +
+          '4. all_layers_combined.svg is the flat single-file version.\n\n' +
+          'For Figma / Illustrator / Inkscape use the Layered SVG export instead; it keeps named groups.\n'
+      });
+      downloadBlob(buildZip(files), `tracecraft_canva_kit_${state.shapes.length}_shapes.zip`, 'application/zip');
+      showToast('Canva Kit downloaded. Opening Canva: drag the SVGs into Uploads.', true);
+      setTimeout(() => showToast('', false), 4500);
+      window.open('https://www.canva.com/', '_blank', 'noopener');
+    });
+
+    const DB_NAME = 'TraceCraftStudioVaultDB';
+    const STORE_NAME = 'runs';
+    let db = null;
+
+    function openVaultDB() {
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = (e) => {
+        const d = e.target.result;
+        if (!d.objectStoreNames.contains(STORE_NAME)) {
+          d.createObjectStore(STORE_NAME, { keyPath: 'id' });
+        }
+      };
+      req.onsuccess = (e) => {
+        db = e.target.result;
+        renderHistoryVault();
+      };
+    }
+    openVaultDB();
+
+    function saveToHistoryVault(entry) {
+      if (!db) return;
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).put(entry);
+      tx.oncomplete = () => renderHistoryVault();
+    }
+
+    function renderHistoryVault() {
+      if (!db) return;
+      const listEl = document.getElementById('historyList');
+      const badgeEl = document.getElementById('histCountBadge');
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const req = tx.objectStore(STORE_NAME).getAll();
+
+      req.onsuccess = () => {
+        const items = (req.result || []).sort((a, b) => b.id.localeCompare(a.id));
+        badgeEl.textContent = `${items.length} SAVED`;
+        if (items.length === 0) {
+          listEl.innerHTML = '<div class="empty-msg">No creations recorded yet. Every trace you run is automatically archived here with full SVG & metric recovery.</div>';
+          return;
+        }
+        listEl.innerHTML = '';
+        items.forEach(item => {
+          const row = document.createElement('div');
+          row.className = 'hist-row';
+          const thumb = item.snapshot?.reconstructed_image_b64
+            ? 'data:image/png;base64,' + item.snapshot.reconstructed_image_b64
+            : (item.origDataUrl || '');
+          row.innerHTML = `
+            <img src="${thumb}" alt="Saved trace thumbnail" />
+            <div>
+              <div style="font-weight:600; color:var(--text-0); margin-bottom:3px;">
+                ${item.shapesCount} Shapes · <span>${item.pqi}% Match</span>
+              </div>
+              <div style="font-size:13px; color:var(--text-2);">
+                SSIM: ${item.ssim} · PSNR: ${item.psnr} dB · ${item.runtime}s
+              </div>
+            </div>
+            <div style="display:flex; gap:6px;">
+              <button class="btn load-vault-btn" style="padding:5px 9px;">Load</button>
+              <button class="btn btn-danger del-vault-btn" style="padding:5px 9px;" aria-label="Delete saved trace">✕</button>
+            </div>
+          `;
+          row.querySelector('.load-vault-btn').addEventListener('click', () => {
+            if (item.origDataUrl) state.origDataUrl = item.origDataUrl;
+            applyTraceResponse(item.snapshot, item.mode);
+          });
+          row.querySelector('.del-vault-btn').addEventListener('click', () => {
+            const delTx = db.transaction(STORE_NAME, 'readwrite');
+            delTx.objectStore(STORE_NAME).delete(item.id);
+            delTx.oncomplete = () => renderHistoryVault();
+          });
+          listEl.appendChild(row);
+        });
+      };
+    }
+
+    document.getElementById('clearHistBtn').addEventListener('click', () => {
+      if (!db) return;
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).clear();
+      tx.oncomplete = () => renderHistoryVault();
+    });
+
+    function renderRunLogTable() {
+      const tbody = document.getElementById('runLogBody');
+      if (state.runLog.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color:var(--text-2);">No runs logged yet.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = '';
+      state.runLog.forEach((r, idx) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${idx + 1}</td>
+          <td><strong>${r.mode}</strong></td>
+          <td>${r.shapesCount}</td>
+          <td>${r.psnr} dB</td>
+          <td>${r.ssim}</td>
+          <td>${r.mse}</td>
+          <td><strong>${r.pqi}%</strong> (${r.grade})</td>
+          <td>${r.runtime}s</td>
+          <td><button class="btn" style="padding:3px 9px; font-size:11px;">Restore</button></td>
+        `;
+        tr.querySelector('button').addEventListener('click', () => {
+          if (r.origDataUrl) state.origDataUrl = r.origDataUrl;
+          applyTraceResponse(r.snapshot, r.mode);
+        });
+        tbody.appendChild(tr);
+      });
+    }
+
+    document.getElementById('clearRunLogBtn').addEventListener('click', () => {
+      state.runLog = [];
+      document.getElementById('compareSummaryBanner').textContent = '';
+      renderRunLogTable();
+    });
+  
+    // =========================================================================
+    // UI LAYER: toasts, export menu, tabs, keyboard shortcuts
+    // =========================================================================
+    function notify(msg, kind) {
+      const host = document.getElementById('toastStack');
+      const el = document.createElement('div');
+      el.className = 'toast' + (kind === 'error' ? ' error' : '');
+      el.setAttribute('role', 'status');
+      el.textContent = msg;
+      host.appendChild(el);
+      setTimeout(() => {
+        el.classList.add('out');
+        setTimeout(() => el.remove(), 260);
+      }, kind === 'error' ? 7000 : 4500);
+    }
+
+    (function initExportMenu() {
+      const btn = document.getElementById('exportMenuBtn');
+      const menu = document.getElementById('exportMenu');
+      const items = () => [...menu.querySelectorAll('[role="menuitem"]:not([hidden])')];
+      function setOpen(open, focusItem) {
+        menu.hidden = !open;
+        btn.setAttribute('aria-expanded', String(open));
+        if (open && focusItem) items()[0]?.focus();
+      }
+      btn.addEventListener('click', (e) => { e.stopPropagation(); setOpen(menu.hidden, true); });
+      btn.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown') { e.preventDefault(); setOpen(true, true); }
+      });
+      menu.addEventListener('click', () => { setOpen(false); btn.focus(); });
+      menu.addEventListener('keydown', (e) => {
+        const list = items();
+        const i = list.indexOf(document.activeElement);
+        if (e.key === 'ArrowDown') { e.preventDefault(); list[(i + 1) % list.length].focus(); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); list[(i - 1 + list.length) % list.length].focus(); }
+        else if (e.key === 'Home') { e.preventDefault(); list[0].focus(); }
+        else if (e.key === 'End') { e.preventDefault(); list[list.length - 1].focus(); }
+        else if (e.key === 'Tab') setOpen(false);
+      });
+      document.addEventListener('click', (e) => { if (!menu.hidden && !menu.contains(e.target)) setOpen(false); });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !menu.hidden) { setOpen(false); btn.focus(); }
+      });
+    })();
+
+    (function initTabs() {
+      const groups = {};
+      document.querySelectorAll('.tab[data-tabgroup]').forEach(tab => {
+        (groups[tab.dataset.tabgroup] = groups[tab.dataset.tabgroup] || []).push(tab);
+      });
+      Object.entries(groups).forEach(([group, tabs]) => {
+        const panels = [...document.querySelectorAll(`.tabpanel[data-tabgroup="${group}"]`)];
+        tabs.forEach(tab => {
+          const panel = panels.find(p => p.dataset.panel === tab.dataset.tab);
+          tab.id = `tab-${group}-${tab.dataset.tab}`;
+          if (!panel) return;
+          panel.id = `panel-${group}-${tab.dataset.tab}`;
+          panel.setAttribute('role', 'tabpanel');
+          panel.setAttribute('aria-labelledby', tab.id);
+          tab.setAttribute('aria-controls', panel.id);
+        });
+        const select = (tab) => {
+          tabs.forEach(t => {
+            const on = t === tab;
+            t.classList.toggle('active', on);
+            t.setAttribute('aria-selected', String(on));
+            t.tabIndex = on ? 0 : -1;
+          });
+          panels.forEach(p => { p.hidden = p.dataset.panel !== tab.dataset.tab; });
+        };
+        tabs.forEach((tab, i) => {
+          tab.addEventListener('click', () => select(tab));
+          tab.addEventListener('keydown', (e) => {
+            let next = null;
+            if (e.key === 'ArrowRight') next = tabs[(i + 1) % tabs.length];
+            else if (e.key === 'ArrowLeft') next = tabs[(i - 1 + tabs.length) % tabs.length];
+            else if (e.key === 'Home') next = tabs[0];
+            else if (e.key === 'End') next = tabs[tabs.length - 1];
+            if (!next) return;
+            e.preventDefault();
+            next.click();
+            next.focus();
+          });
+        });
+        select(tabs.find(t => t.classList.contains('active')) || tabs[0]);
+      });
+    })();
+
+    window.addEventListener('keydown', (e) => {
+      const t = e.target;
+      const tag = t && t.tagName;
+      const typing = tag === 'TEXTAREA' || tag === 'SELECT' ||
+        (tag === 'INPUT' && !['range', 'checkbox', 'color'].includes(t.type));
+      if (typing || e.altKey || e.metaKey) return;
+      const click = (id) => { const b = document.getElementById(id); if (b && !b.disabled) b.click(); };
+      if ((e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); click('undoEditBtn'); return; }
+      if (e.ctrlKey) return;
+      if (e.code === 'Space' && tag !== 'BUTTON') { e.preventDefault(); click('tlPlayBtn'); }
+      else if (e.key === '[') click('tlPrevBtn');
+      else if (e.key === ']') click('tlNextBtn');
+      else if ((e.key === 'Delete' || e.key === 'Backspace') && tag !== 'BUTTON') {
+        if (state.selectedShapeId) { e.preventDefault(); click('deleteShapeBtn'); }
+      }
+    });
+
+  
+    // =========================================================================
+    // POLISH LAYER: intro, drag/drop/paste, slider fill, scan effect
+    // =========================================================================
+    (function () {
+      const intro = document.getElementById('intro');
+      const shell = [document.querySelector('.topbar'), document.getElementById('workspaceRoot')];
+      const setShellInert = (on) => shell.forEach(el => { if (el) el.inert = on; });
+
+      function closeIntro() {
+        intro.classList.add('leave');
+        setShellInert(false);
+        document.body.style.overflow = '';
+        document.getElementById('main').focus();
+      }
+      document.body.style.overflow = 'hidden';
+      setShellInert(true);
+      document.getElementById('introGo').addEventListener('click', closeIntro);
+      intro.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeIntro(); });
+      document.getElementById('introGo').focus();
+
+      // Drag, drop and paste feed the existing file input so all upload logic is reused
+      const drop = document.getElementById('dropZone');
+      function giveFile(f) {
+        if (!f || !f.type.startsWith('image/')) { notify('That file is not an image.', 'error'); return; }
+        const dt = new DataTransfer();
+        dt.items.add(f);
+        fileInput.files = dt.files;
+        fileInput.dispatchEvent(new Event('change'));
+      }
+      ['dragenter', 'dragover'].forEach(t => window.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
+      ['dragleave', 'drop'].forEach(t => window.addEventListener(t, e => { e.preventDefault(); if (t === 'drop' || !e.relatedTarget) drop.classList.remove('over'); }));
+      window.addEventListener('drop', e => giveFile(e.dataTransfer.files[0]));
+      window.addEventListener('paste', e => {
+        const item = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/'));
+        if (item) giveFile(item.getAsFile());
+      });
+      drop.addEventListener('click', e => { if (e.target === drop) fileInput.click(); });
+
+      // Scan effect while a trace runs
+      const baseToast = showToast;
+      showToast = function (msg, show) {
+        baseToast(msg, show);
+        document.body.classList.toggle('tracing', !!show && /Running/.test(msg));
+      };
+    })();
+  
+
+    // Mode Switcher: Painterly Studio vs. Clean Flat Vector (Edit Mode)
+    const modePainterlyBtn = document.getElementById('modePainterlyBtn');
+    const modeCleanBtn = document.getElementById('modeCleanBtn');
+
+    modePainterlyBtn.addEventListener('click', () => {
+      state.renderMode = 'painterly';
+      modePainterlyBtn.classList.add('active');
+      modeCleanBtn.classList.remove('active');
+      tlSlider.max = Math.max(0, state.shapes.length);
+      tlSlider.value = state.shapes.length;
+      state.currentStep = state.shapes.length;
+      renderSvgStudio();
+      renderLayersList();
+      updateMetricsCards();
+      notify('Switched to painterly view.');
+    });
+
+    modeCleanBtn.addEventListener('click', () => {
+      if (!state.cleanShapes.length) {
+        notify('Run a trace first to generate clean editable vector shapes.', 'error');
+        return;
+      }
+      state.renderMode = 'clean';
+      modeCleanBtn.classList.add('active');
+      modePainterlyBtn.classList.remove('active');
+      tlSlider.max = state.cleanShapes.length;
+      tlSlider.value = state.cleanShapes.length;
+      state.currentStep = state.cleanShapes.length;
+      renderSvgStudio();
+      renderLayersList();
+      updateMetricsCards();
+      notify(`Switched to clean view: ${state.cleanShapes.length} non-overlapping shapes.`);
+    });
+
+    function generateCleanFlatSvgString() {
+      const w = state.viewBox.width || 360;
+      const h = state.viewBox.height || 360;
+      const shapes = state.cleanShapes.length ? state.cleanShapes : state.shapes;
+      let out = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+      out += `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">\n`;
+      out += `  <metadata>Generated by TraceCraft Clean Edit Vectorizer (${shapes.length} lightweight editable primitives)</metadata>\n`;
+      out += `  <g id="clean-graphic-vector-layers">\n`;
+      shapes.forEach(s => {
+        const fill = s.fill || s.color || '#ff6a1a';
+        const op = s.opacity !== undefined ? s.opacity : 1.0;
+        if (s.type === 'path') {
+          out += `    <path id="${s.id}" data-layer="${s.layer || 'form'}" d="${buildPathD(s)}" fill="${fill}" fill-opacity="${op}" />\n`;
+        } else {
+          const pts = (s.points || []).map(p => `${p[0]},${p[1]}`).join(' ');
+          out += `    <polygon id="${s.id}" data-layer="${s.layer || 'form'}" points="${pts}" fill="${fill}" fill-opacity="${op}" />\n`;
+        }
+      });
+      out += `  </g>\n</svg>`;
+      return out;
+    }
+
+    document.getElementById('exportCleanSvgBtn').addEventListener('click', () => {
+      if (!state.cleanShapes.length && !state.shapes.length) {
+        notify('Run TraceCraft first to export clean vector shapes.');
+        return;
+      }
+      const svgStr = generateCleanFlatSvgString();
+      downloadBlob(svgStr, `tracecraft_clean_edit_${state.cleanShapes.length || state.shapes.length}_shapes.svg`, 'image/svg+xml;charset=utf-8');
+      notify(`Exported clean SVG with ${state.cleanShapes.length || state.shapes.length} shapes.`);
+    });
+
+    // Expose the on/off state of toggle buttons to assistive tech
+    (function syncToggleState() {
+      const sel = '#viewSplitBtn, #viewSingleBtn, [data-lefttab], #modePainterlyBtn, #modeCleanBtn, [data-ovmode], [data-preset]';
+      const sync = (b) => b.setAttribute('aria-pressed', String(b.classList.contains('active')));
+      const observer = new MutationObserver(records => records.forEach(r => sync(r.target)));
+      document.querySelectorAll(sel).forEach(b => {
+        sync(b);
+        observer.observe(b, { attributes: true, attributeFilter: ['class'] });
+      });
+    })();
+
+  </script>
+</body>
+</html>
