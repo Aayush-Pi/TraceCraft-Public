@@ -30,7 +30,11 @@
 ## Demo video
 
 
-https://github.com/user-attachments/assets/b0012ee4-9963-4fe0-9c8d-add907f35bbc
+
+
+https://github.com/user-attachments/assets/d8ab1eae-8f45-4240-855d-e643ebb27d69
+
+
 
 
 
@@ -184,8 +188,8 @@ Both outputs are scored against the working-resolution original with MSE, PSNR a
 
 ### 1. Clone the repository
 ```bash
-git clone <https://github.com/Aayush-Pi/TraceCraft/>
-cd <TraceCraft>
+git clone <https://github.com/Aayush-Pi/TraceCraft-Public/>
+cd <TraceCraft-Public>
 ```
 
 ### 2. Create a virtual environment (recommended)
